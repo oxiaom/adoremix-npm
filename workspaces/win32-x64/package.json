@@ -1,6 +1,6 @@
 {
   "name": "@oxiaom/adoremix-win32-x64",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "AdoreMix native binaries and resources for Windows x64",
   "main": "./index.js",
   "_publish_os": [
