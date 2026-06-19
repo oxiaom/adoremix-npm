@@ -17,7 +17,8 @@ const NODE_HELPER_DEPS = {
   'mysql': '^2.18.1',
   'request': '^2.88.2',
   'sqlite': '^4.2.0',
-  'ws': '^8.13.0'
+  'ws': '^8.13.0',
+  'ini': '^4.1.3'
 };
 
 function isWorkdirInitialized(workdir) {

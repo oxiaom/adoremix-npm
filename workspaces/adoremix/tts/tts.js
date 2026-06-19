@@ -45,10 +45,12 @@ async function main() {
   // 读 config.ini 找 provider
   const cfgPath = path.join(process.cwd(), 'config.ini');
   let ttsSection = {};
+  let settings = {};
   if (fs.existsSync(cfgPath)) {
     try {
       const cfg = ini.parse(fs.readFileSync(cfgPath, 'utf-8'));
       ttsSection = cfg.TTS || {};
+      settings = cfg.Settings || {};
     } catch (e) { err(`config.ini 解析失败: ${e.message}`); }
   }
   const providerName = (ttsSection.provider || 'xf').toLowerCase();
@@ -65,7 +67,6 @@ async function main() {
 
   // 凭证：优先 config.ini，命令行参数兼容旧版 xf
   // 兼容 Qt 已有字段：Settings.ttsxfAPPID / ttsxfAPISecret / ttsxfAPIKey
-  const settings = cfg.Settings || {};
   const creds = {
     xf_appid: ttsSection.xf_appid || settings.ttsxfAPPID || appidArg || '',
     xf_apiSecret: ttsSection.xf_apiSecret || settings.ttsxfAPISecret || apiSecretArg || '',
