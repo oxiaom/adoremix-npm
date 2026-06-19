@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>AdoreMix 广播服务器</title>
+  <meta name="description" content="基于 Qt/C++ 的广播服务器，npm 一键跨平台部署">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔊</text></svg>">
+  <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/docsify@4/themes/vue.css">
+  <style>
+    :root {
+      --theme-color: #42b983;
+      --text-color: #34495e;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans SC', sans-serif; }
+    .cover-main h1 { font-size: 3rem; }
+    .cover-main h1 small { font-size: 1.2rem; }
+    .markdown-section h1 { border-bottom: 2px solid var(--theme-color); padding-bottom: .3em; }
+    .markdown-section h2 { border-bottom: 1px solid #eee; padding-bottom: .3em; }
+    .sidebar-nav h2 { font-size: 1rem; color: var(--theme-color); margin-top: 1.5em; }
+    table { display: block; overflow-x: auto; }
+    .search input { font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script>
+    window.$docsify = {
+      name: 'AdoreMix',
+      repo: 'oxiaom/adoremix-npm',
+      loadSidebar: true,
+      subMaxLevel: 3,
+      loadNavbar: false,
+      coverpage: false,
+      search: {
+        placeholder: '搜索文档...',
+        noData: '没有找到结果',
+        depth: 3,
+        hideOtherSidebarContent: false
+      },
+      auto2top: true,
+      themeColor: '#42b983',
+      footer: {
+        copy: '<span>AdoreMix &copy; 2026</span>',
+        auth: '<a href="https://github.com/oxiaom/adoremix-npm">GitHub</a>',
+        pre: '<hr/>',
+        style: 'text-align: right; color: #999; font-size: 0.8em; margin-top: 3em;'
+      },
+      plugins: [
+        function footer(hook) {
+          var footer = '<hr/><footer style="text-align:right;color:#999;font-size:0.8em;margin-top:3em;">AdoreMix © 2026 · <a href="https://github.com/oxiaom/adoremix-npm">GitHub</a></footer>';
+          hook.afterEach(function(html) {
+            return html + footer;
+          });
+        }
+      ]
+    };
+  </script>
+
+  <script src="//cdn.jsdelivr.net/npm/docsify@4"></script>
+  <script src="//cdn.jsdelivr.net/npm/docsify/lib/plugins/search.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-ini.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-json.min.js"></script>
+</body>
+</html>
