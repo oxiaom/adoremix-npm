@@ -229,6 +229,21 @@ function buildProgram() {
       process.exitCode = code || 0;
     });
 
+  config
+    .command('webui')
+    .description('切换 WebUI 版本（low=16k 互联网 / high=44.1k 局域网）')
+    .option('--workdir <path>')
+    .option('--variant <v>', '直接指定: low | high')
+    .option('--no-interactive', '用当前配置部署')
+    .action(async (opts) => {
+      const webui = require('./config/webui');
+      const code = await webui.setupWebui(resolveWorkdir(opts.workdir), {
+        variant: opts.variant,
+        interactive: opts.interactive !== false
+      });
+      process.exitCode = code || 0;
+    });
+
   const runner = require('./runner');
   const nativeRef = () => {
     try { return paths.loadNative(); }

@@ -54,7 +54,8 @@ module.exports = {
     ttsxfAPISecret: '',
     ttsxfAPIKey: '',
     cutepath: 'etc/docroot',
-    cuteport: 12083
+    cuteport: 12083,
+    webui: 'low'
   },
   listener: {
     port: 12080,

@@ -38,7 +38,8 @@
     "bin",
     "src",
     "templates",
-    "tts"
+    "tts",
+    "webui"
   ],
   "keywords": [
     "adoremix",

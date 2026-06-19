@@ -140,6 +140,22 @@ function deployTtsDispatcher(workdir) {
   logger.log('    测试：adoremix tts test "你好"');
 }
 
+// 部署 WebUI 到 etc/docroot/（按 Settings.webui 配置选 low/high）
+function deployWebuiIfPresent(workdir) {
+  try {
+    const webui = require('./config/webui');
+    const cfg = require('./config');
+    const variant = cfg.getConfigValue(workdir, 'Settings.webui') || 'low';
+    if (webui.deployWebui(workdir, variant)) {
+      logger.ok(`部署 WebUI: ${variant} → etc/docroot/`);
+      logger.log('    切换：adoremix config webui');
+    }
+  } catch (e) {
+    // 静默失败（webui 目录不存在时不算错误）
+    logger.warn(`WebUI 部署跳过：${e.message}`);
+  }
+}
+
 async function runInstall(opts) {
   opts = opts || {};
   const workdir = opts.workdir || paths.defaultWorkdir();
@@ -177,6 +193,7 @@ async function runInstall(opts) {
     return 1;
   }
   deployTtsDispatcher(workdir);
+  deployWebuiIfPresent(workdir);
 
   const config = require('./config');
   const cfgOk = await config.ensureConfig(workdir, { interactive: opts.interactive !== false, force: opts.force });
