@@ -1,6 +1,6 @@
 {
   "name": "@oxiaom/adoremix-linux-x64",
-  "version": "1.0.17",
+  "version": "1.0.18",
   "description": "AdoreMix native binaries and resources for Linux x64",
   "main": "./index.js",
   "_publish_os": [
