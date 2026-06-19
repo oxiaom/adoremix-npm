@@ -10,6 +10,23 @@ const NET_KEYS = [
   'Settings.Fip'
 ];
 
+const PREURL_KEY = 'Settings.preurl';
+const HTTP_PORT_KEY = 'listener.port';
+
+// 默认 preurl 格式：http://<IP>:<port>/
+// 如果用户改成 CDN 域名（如 http://cdn.xxx.com/），改 IP 时不应该覆盖
+function extractPreurlHost(preurl) {
+  if (!preurl) return null;
+  const m = String(preurl).match(/^https?:\/\/([^:/]+)/);
+  return m ? m[1] : null;
+}
+
+function isPreurlCdn(preurl) {
+  const host = extractPreurlHost(preurl);
+  if (!host) return false;
+  return !isValidIPv4(host);  // 域名 = CDN，IP = 直连
+}
+
 function listInterfaces() {
   const ifaces = os.networkInterfaces();
   const list = [];
@@ -109,6 +126,19 @@ async function setupNetwork(workdir, opts) {
   }
   logger.ok(`已设置 ${NET_KEYS.map(k => k.split('.')[1]).join(' / ')} = ${ip}`);
 
+  // 智能更新 preurl：如果是 IP 格式（直连），同步改；CDN 域名不动
+  const currentPreurl = cfg.getConfigValue(workdir, PREURL_KEY);
+  const port = cfg.getConfigValue(workdir, HTTP_PORT_KEY) || 12080;
+  if (currentPreurl && isPreurlCdn(currentPreurl)) {
+    logger.log('');
+    logger.log(`preurl 当前是 CDN/域名：${currentPreurl}（保留不覆盖）`);
+    logger.log('  改 CDN 用：adoremix config preurl http://cdn.your.com/');
+  } else {
+    const newPreurl = `http://${ip}:${port}/`;
+    cfg.setConfigValue(workdir, PREURL_KEY, newPreurl);
+    logger.ok(`已同步更新 preurl = ${newPreurl}`);
+  }
+
   // 顺便显示当前端口配置，方便检查
   const ports = [
     ['listener.port', 'HTTP 网页'],
@@ -128,4 +158,62 @@ async function setupNetwork(workdir, opts) {
   return 0;
 }
 
-module.exports = { setupNetwork, listInterfaces, isValidIPv4, NET_KEYS };
+async function setupPreurl(workdir, opts) {
+  opts = opts || {};
+  const cfg = require('./index');
+  const current = cfg.getConfigValue(workdir, PREURL_KEY);
+  const port = cfg.getConfigValue(workdir, HTTP_PORT_KEY) || 12080;
+  const ip = cfg.getConfigValue(workdir, 'Settings.LocalIP') || '127.0.0.1';
+
+  let url;
+  if (opts.url) {
+    url = opts.url;
+  } else if (opts.interactive === false) {
+    url = `http://${ip}:${port}/`;
+  } else {
+    logger.log('');
+    logger.log('=== preurl 配置（设备拉资源用的 URL）===');
+    logger.log('说明：');
+    logger.log('  • 直连：http://<本机IP>:<端口>/（默认）');
+    logger.log('  • CDN 加速：http://cdn.your.com/（设备从 CDN 拉资源）');
+    logger.log(`  • 当前值：${current}`);
+    logger.log('');
+    const resp = await prompts({
+      type: 'select',
+      name: 'choice',
+      message: '选择 preurl 来源',
+      choices: [
+        { title: `用本机直连：http://${ip}:${port}/`, value: 'direct' },
+        { title: '🌐  手动输入 CDN/外网地址', value: 'custom' }
+      ]
+    });
+    if (resp.choice === 'direct') {
+      url = `http://${ip}:${port}/`;
+    } else if (resp.choice === 'custom') {
+      const r2 = await prompts({
+        type: 'text',
+        name: 'url',
+        message: '输入完整 URL（含 http(s):// 和末尾 /）',
+        initial: 'http://cdn.example.com/',
+        validate: v => /^https?:\/\/[^/]+\//.test(v) ? true : '格式：http(s)://域名或IP/'
+      });
+      url = r2.url;
+    } else {
+      return 1;
+    }
+  }
+  cfg.setConfigValue(workdir, PREURL_KEY, url);
+  logger.ok(`preurl = ${url}`);
+  logger.log('改完后记得：adoremix restart');
+  return 0;
+}
+
+module.exports = {
+  setupNetwork,
+  setupPreurl,
+  listInterfaces,
+  isValidIPv4,
+  isPreurlCdn,
+  NET_KEYS,
+  PREURL_KEY
+};

@@ -132,6 +132,21 @@ function buildProgram() {
       process.exitCode = code || 0;
     });
 
+  config
+    .command('preurl')
+    .description('配置设备拉资源用的 URL（默认 http://IP:12080/，CDN 加速改成域名）')
+    .option('--workdir <path>')
+    .option('--url <url>', '直接指定 URL（如 http://cdn.your.com/）')
+    .option('--no-interactive', '用本机 IP 自动生成')
+    .action(async (opts) => {
+      const net = require('./config/network');
+      const code = await net.setupPreurl(resolveWorkdir(opts.workdir), {
+        url: opts.url,
+        interactive: opts.interactive !== false
+      });
+      process.exitCode = code || 0;
+    });
+
   const runner = require('./runner');
   const nativeRef = () => {
     try { return paths.loadNative(); }
