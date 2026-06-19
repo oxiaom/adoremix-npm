@@ -192,12 +192,10 @@ async function cmdTest(workdir, text, opts) {
     return 1;
   }
 
-  // 准备文本 + 输出
+  // 准备文本 + 输出（都用相对路径，dispatcher 在 cwd=workdir 下跑）
   const ttyDir = path.join(workdir, 'tty');
   if (!fs.existsSync(ttyDir)) fs.mkdirSync(ttyDir, { recursive: true });
-  const txtFile = path.join(ttyDir, '_cli_test.txt');
-  const outFile = path.join(ttyDir, '_cli_test.mp3');
-  fs.writeFileSync(txtFile, text);
+  fs.writeFileSync(path.join(ttyDir, '_cli_test.txt'), text);
 
   // 调用 dispatcher
   const ttsJs = path.join(workdir, 'tts.js');
@@ -207,10 +205,12 @@ async function cmdTest(workdir, text, opts) {
   }
   logger.info(`provider=${c.provider} voice=${voice} text="${text.slice(0, 40)}${text.length > 40 ? '...' : ''}"`);
   try {
-    execSync(`node "${ttsJs}" ${volume} ${speed} ${voice} _cli_test.mp3 _cli_test.txt`, {
+    // dispatcher 接收：mp3 名（写到 ./tty/）+ txt 路径（cwd 相对）
+    execSync(`node "${ttsJs}" ${volume} ${speed} ${voice} _cli_test.mp3 tty/_cli_test.txt`, {
       cwd: workdir,
       stdio: 'inherit'
     });
+    const outFile = path.join(ttyDir, '_cli_test.mp3');
     if (fs.existsSync(outFile)) {
       const size = fs.statSync(outFile).size;
       logger.ok(`✓ 生成成功: ${outFile} (${(size / 1024).toFixed(1)} KB)`);
