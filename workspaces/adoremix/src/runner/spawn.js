@@ -13,6 +13,22 @@ function ensureLogFiles(workdirPaths) {
   fs.mkdirSync(workdirPaths.logsDir, { recursive: true });
 }
 
+function resolveBin(native, workdir) {
+  // 优先用工作目录的二进制（install 时已 chmod 0755）
+  // 兜底用 node_modules 子包里的二进制（npm 解包后可能缺 +x 权限）
+  const workdirBin = path.join(workdir, native.binName);
+  if (fs.existsSync(workdirBin)) return workdirBin;
+  return native.bin;
+}
+
+function ensureExec(binPath) {
+  try {
+    fs.chmodSync(binPath, 0o755);
+  } catch (e) {
+    // 忽略权限错误（可能没权限改）
+  }
+}
+
 function startForeground(opts) {
   const native = opts.native;
   const workdir = opts.workdir;
@@ -23,13 +39,15 @@ function startForeground(opts) {
   if (!fs.existsSync(configPath)) {
     throw new Error(`配置不存在 ${configPath}，请先运行 adoremix install`);
   }
-  if (!fs.existsSync(native.bin)) {
-    throw new Error(`原生二进制不存在 ${native.bin}`);
+  const bin = resolveBin(native, workdir);
+  if (!fs.existsSync(bin)) {
+    throw new Error(`原生二进制不存在 ${bin}`);
   }
+  ensureExec(bin);
 
   const args = [path.basename(configPath)];
   logger.info(`spawn ${native.binName} ${args.join(' ')} (cwd=${workdir})`);
-  const child = spawn(native.bin, args, {
+  const child = spawn(bin, args, {
     cwd: workdir,
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: false
@@ -68,9 +86,11 @@ function startDaemon(opts) {
   if (!fs.existsSync(configPath)) {
     throw new Error(`配置不存在 ${configPath}，请先运行 adoremix install`);
   }
-  if (!fs.existsSync(native.bin)) {
-    throw new Error(`原生二进制不存在 ${native.bin}`);
+  const bin = resolveBin(native, workdir);
+  if (!fs.existsSync(bin)) {
+    throw new Error(`原生二进制不存在 ${bin}`);
   }
+  ensureExec(bin);
 
   const running = pidMgr.readPid(wp.pidfile);
   if (running && pidMgr.isRunning(running)) {
@@ -82,7 +102,7 @@ function startDaemon(opts) {
   const err = fs.openSync(wp.logfile, 'a');
   const args = [path.basename(configPath)];
   logger.info(`spawn ${native.binName} ${args.join(' ')} (cwd=${workdir}, daemon)`);
-  const child = spawn(native.bin, args, {
+  const child = spawn(bin, args, {
     cwd: workdir,
     stdio: ['ignore', out, err],
     detached: true,
