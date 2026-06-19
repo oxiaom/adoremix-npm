@@ -64,7 +64,7 @@ jobs:
           fi
           ls -lh _src/adoremix.tar.gz
           file _src/adoremix.tar.gz
-          tar -xzf _src/adoremix.tar.gz -C _src/Adore_mix2 --strip-components=0
+          tar -xzf _src/adoremix.tar.gz -C _src/Adore_mix2 --strip-components=1
           test -f _src/Adore_mix2/AdoreMix.pro
 
       - name: Build AdoreMix
