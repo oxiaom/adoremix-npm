@@ -1,0 +1,19 @@
+[Unit]
+Description=AdoreMix Broadcast Server
+Documentation=https://github.com/your-org/adoremix
+After=network.target mysqld.service redis.service
+
+[Service]
+Type=simple
+User=__USER__
+Group=__GROUP__
+WorkingDirectory=__WORKDIR__
+ExecStart=__NODE__ __CLI__ start --daemon --workdir __WORKDIR__
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:__WORKDIR__/logs/svc.log
+StandardError=append:__WORKDIR__/logs/svc.err
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,213 @@
+# syntax=docker/dockerfile:1.4
+#
+# 在 x64 主机（Windows/Mac/Linux）上用 docker buildx + QEMU 跨架构编译 ARM64 AdoreMix。
+# 用法见 docker/build-linux-arm64.sh。
+#
+# 镜像内流程：
+#   1) apt 装 Qt 5.15 dev + hiredis + opus + lame + openssl + mariadb
+#   2) 编译 QtCipherSqlitePlugin（Adore_mix2 源码自带）
+#   3) sed 修复 AdoreMix.pro 的硬编码 ARM 路径
+#   4) qmake + make 编译 AdoreMix
+#   5) 收集二进制 + 依赖 .so + Qt plugins + 资源 到 /out
+# 最终产物 /out 直接对应 workspaces/linux-arm64/native/。
+
+FROM --platform=linux/arm64 arm64v8/ubuntu:22.04
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG ADORE_VERSION=8.0.17
+ARG TARGET_BIN=AdoreMixV8.0.17_console_linuxarm64
+
+RUN apt-get update && \
+    (apt-get install -y --no-install-recommends \
+        build-essential \
+        qtbase5-dev \
+        qtbase5-private-dev \
+        qttools5-dev \
+        libqt5websockets5-dev \
+        qtmultimedia5-dev \
+        libqt5multimedia5-plugins \
+        libqt5sql5-mysql \
+        libqt5sql5-sqlite \
+        libqt5svg5 \
+        libssl-dev \
+        libhiredis-dev \
+        libopus-dev \
+        libopusfile-dev \
+        libmp3lame-dev \
+        libmariadb-dev \
+        libsqlite3-dev \
+        file \
+        patchelf \
+        wget \
+        ca-certificates \
+        git \
+     || true) && \
+    dpkg --configure -a || true && \
+    (ldconfig || true) && \
+    rm -rf /var/lib/apt/lists/*
+
+# 验证 apt 装出来的关键 Qt 依赖（libc-bin 的 post-inst ldconfig 在 QEMU 下会 segfault，但不影响后续编译）
+RUN test -f /usr/lib/aarch64-linux-gnu/libQt5Core.so.5 && \
+    which qmake && \
+    qmake -query QT_INSTALL_LIBS && \
+    qmake -query QT_INSTALL_PLUGINS
+
+# 拷源码（构建上下文是 Adore_mix2 目录）
+COPY . /src
+WORKDIR /src
+
+# 0) 清理所有 Qt Creator / 旧编译残留
+#    源码目录在 Windows 上用 x64 Qt 编译过，残留 .qmake.stash/.pro.user/mkspecs 会引用
+#    x86_64 路径，让 ARM64 moc 解析头文件时定位到错误 include，报 "Parse error at std"
+#    同时清理 .obj/*.o（x86_64 ELF，会让 ARM64 linker 报 "file in wrong format"）
+RUN find /src \( \
+        -name '.qmake.stash' -o \
+        -name '*.pro.user' -o \
+        -name '*.pro.user.*' -o \
+        -name 'Makefile' -o \
+        -name 'Makefile.Debug' -o \
+        -name 'Makefile.Release' -o \
+        -name '.moc' -o \
+        -name '.uic' -o \
+        -name '.rcc' -o \
+        -name '.obj' -o \
+        -name 'mkspecs' -o \
+        -name 'build-*' -o \
+        -name 'debug' -o \
+        -name 'release' -o \
+        -name '*.o' -o \
+        -name '*.obj' -o \
+        -name '*.a' -o \
+        -name 'libsqlitecipher.so' -o \
+        -name 'libsqlitecipher.so.*' \
+    \) -prune -exec rm -rf {} + 2>/dev/null ; \
+    echo "=== /src 清理完成 ==="
+
+# 0.5) 修复 Windows→Linux 大小写敏感问题
+#      源码里 #include "severinit.h" 但文件名是 Severinit.h（Windows 不敏感能跑，Linux 报错）
+#      对所有含大写字母的 .h/.cpp 创建全小写的符号链接（不修改源码）
+RUN find /src -type f \( -name '*.h' -o -name '*.cpp' -o -name '*.hpp' \) | while read f; do \
+        dir=$(dirname "$f"); \
+        base=$(basename "$f"); \
+        lower=$(echo "$base" | tr 'A-Z' 'a-z'); \
+        if [ "$base" != "$lower" ] && [ ! -e "$dir/$lower" ]; then \
+            ln -s "$base" "$dir/$lower"; \
+        fi; \
+    done ; \
+    echo "=== 大小写符号链接创建完成 ===" ; \
+    ls /src/MediaCoreForNSP616/ | grep -i severinit
+
+# 1) 编译 QtCipherSqlitePlugin -> 生成 libsqlitecipher.so
+#    同时放到 /usr/lib（link 时 -lsqlitecipher 找得到）和 Qt plugins/sqldrivers（运行时 Qt 加载）
+#    注意：源码目录里残留了原作者机器的 Makefile，会引用不存在的 /usr/bin/qmake59.9，必须先删除
+RUN SUBDIR=$(ls -d QtCipherSqlitePlugin-develop/QtCipherSqlitePlugin-develop 2>/dev/null || echo QtCipherSqlitePlugin-develop) && \
+    if [ -d "$SUBDIR" ] && [ -f "$SUBDIR/QtCipherSqlitePlugin.pro" ]; then \
+        find "$SUBDIR" -name 'Makefile' -delete ; \
+        find "$SUBDIR" -name 'Makefile.Debug' -delete ; \
+        find "$SUBDIR" -name 'Makefile.Release' -delete ; \
+        cd "$SUBDIR/sqlitecipher" && \
+        qmake sqlitecipher.pro && \
+        make -j$(nproc) && \
+        find . -name 'libsqlitecipher.so' -exec ls -la {} \; && \
+        SO_PATH=$(find . -name 'libsqlitecipher.so' | head -1) && \
+        cp "$SO_PATH" /usr/lib/aarch64-linux-gnu/ && \
+        chmod 0755 /usr/lib/aarch64-linux-gnu/libsqlitecipher.so && \
+        (ldconfig || true) && \
+        QT_PLUGINS=$(qmake -query QT_INSTALL_PLUGINS) && \
+        mkdir -p $QT_PLUGINS/sqldrivers && \
+        cp "$SO_PATH" $QT_PLUGINS/sqldrivers/ ; \
+    else \
+        echo "警告：QtCipherSqlitePlugin 源码未找到" ; \
+    fi
+
+# 2) 修复 .pro 硬编码路径（-L/opt/qt5.9.1-arm/... 已经不需要，.so 在 /usr/lib）
+#    同时把 TARGET 改成 arm64 二进制名
+RUN sed -i \
+        -e 's|-L/opt/qt5\.[0-9][^ ]*plugins/sqldrivers||g' \
+        -e 's|AdoreMixV8\.0\.17_console_linuxarm0|'${TARGET_BIN}'|g' \
+        AdoreMix.pro && \
+    grep -E '^(TARGET|LIBS)' AdoreMix.pro
+
+# 3) 编译主程序
+RUN qmake AdoreMix.pro && make -j$(nproc)
+
+# 4) 验证二进制架构
+RUN test -f ${TARGET_BIN} && \
+    ls -la ${TARGET_BIN} && \
+    (file ${TARGET_BIN} || echo "file 命令缺失，跳过架构校验")
+
+# 5) 收集产物到 /out
+RUN mkdir -p /out /out/lib /out/platforms /out/sqldrivers \
+             /out/bearer /out/iconengines /out/imageformats \
+             /out/translations /out/mediaservice /out/audio \
+             /out/etc /out/conf /out/html \
+             /out/logs /out/var /out/dmp /out/tty /out/temp
+
+# 主二进制
+RUN cp ${TARGET_BIN} /out/ && chmod 0755 /out/${TARGET_BIN}
+
+# Qt 运行时（核心 .so）
+RUN QT_LIB=$(qmake -query QT_INSTALL_LIBS) && \
+    for lib in libQt5Core libQt5Network libQt5Sql libQt5WebSockets \
+               libQt5Multimedia libQt5Svg libQt5Concurrent libQt5Xml \
+               libQt5MultimediaGstTools libQt5OpenGL libQt5DBus; do \
+        cp $QT_LIB/${lib}.so* /out/lib/ 2>/dev/null || true ; \
+    done
+
+# Qt plugins（用 cp -r 整目录拷贝，避免 cp -a X/. Y 在某些环境下丢目录）
+RUN QT_PLUGINS=$(qmake -query QT_INSTALL_PLUGINS) && \
+    for sub in platforms sqldrivers bearer iconengines imageformats mediaservice audio; do \
+        rm -rf /out/$sub && \
+        (cp -r $QT_PLUGINS/$sub /out/$sub 2>/dev/null || mkdir -p /out/$sub) ; \
+    done && \
+    mkdir -p /out/translations && \
+    cp /usr/share/qt5/translations/qtbase_*.qm /out/translations/ 2>/dev/null || true && \
+    echo "=== sqldrivers ===" && ls -la /out/sqldrivers/ && \
+    echo "=== platforms ===" && ls /out/platforms/
+
+# 第三方库
+RUN for lib in libhiredis libopus libopusfile libmp3lame libssl libcrypto \
+               libsqlite3 libmariadb libstdc++ libgcc_s; do \
+        find /usr/lib -name "${lib}*.so*" -exec cp -a {} /out/lib/ \; 2>/dev/null ; \
+    done
+
+# qt.conf（让 Qt 知道 plugins 在同级目录）
+RUN printf '[Paths]\nPlugins=./\nLibraries=./lib\n' > /out/qt.conf
+
+# 业务资源（用 cp -r src/. dst/ 避免嵌套：cp -r etc /out/etc 会变成 /out/etc/etc）
+RUN mkdir -p /out/etc /out/conf /out/html ; \
+    cp -r etc/. /out/etc/ 2>/dev/null || true ; \
+    cp -r conf/. /out/conf/ 2>/dev/null || true ; \
+    cp -r html/. /out/html/ 2>/dev/null || true ; \
+    for f in tts.js find.js findsc.js xiaoboshu.py; do \
+        [ -f "$f" ] && cp "$f" /out/ ; \
+    done ; \
+    which lame && cp $(which lame) /out/lame && chmod 0755 /out/lame || true ; \
+    # 瘦身：删 mp3（用户决定不需要）+ 备份目录 + link-time .so
+    find /out/etc -name "*.mp3" -delete 2>/dev/null || true ; \
+    rm -rf /out/etc/docroot_ 2>/dev/null || true ; \
+    find /out/lib -maxdepth 1 -type f -name "*.so" ! -name "*.so.*" -delete 2>/dev/null || true ; \
+    echo "=== /out 顶层 ===" && ls -la /out/ | head -30
+
+# patchelf 修复 RPATH（让二进制到 lib/ 下找依赖）
+RUN cd /out && patchelf --set-rpath '$ORIGIN/lib' ${TARGET_BIN} 2>/dev/null || true
+
+# 解引用所有 symlink -> 实际文件
+# Windows 主机文件系统不支持相对路径 symlink，docker cp 会因 symlink 失败而静默丢目录
+RUN find /out -type l -exec sh -c 'target=$(readlink -f "$1") && [ -n "$target" ] && rm "$1" && cp "$target" "$1"' _ {} \; 2>/dev/null ; \
+    # 删除仍然无效的 symlink（指向容器外或不存在路径，例如 libstdc++.so -> aarch64-linux-gnu/...）
+    find /out -xtype l -delete 2>/dev/null ; \
+    echo "=== /out 剩余 symlink ===" && find /out -type l | wc -l
+
+# 用 ldd 验证依赖
+RUN cd /out && ldd ${TARGET_BIN} | grep "not found" && \
+    echo "警告：有未解决的依赖" && exit 1 || \
+    echo "依赖完整"
+
+# 元信息
+RUN printf '{"version":"%s","platform":"linux","arch":"arm64","bin":"%s","builtAt":"%s"}\n' \
+        "${ADORE_VERSION}" "${TARGET_BIN}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        > /out/.adoremix-native.json
+
+# 默认输出目录结构
+CMD ["bash", "-c", "find /out -maxdepth 2 -type f | sort"]

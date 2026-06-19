@@ -1,0 +1,21 @@
+{
+  "name": "adoremix-monorepo",
+  "private": true,
+  "version": "1.0.1",
+  "description": "AdoreMix broadcast server - monorepo for npm-packaged cross-platform distribution",
+  "workspaces": [
+    "workspaces/adoremix",
+    "workspaces/win32-x64",
+    "workspaces/linux-x64",
+    "workspaces/linux-arm64",
+    "workspaces/linux-arm"
+  ],
+  "scripts": {
+    "version": "node workspaces/adoremix/bin/adoremix.js version",
+    "split": "node scripts/split-zip.js",
+    "publish:all": "node scripts/publish-all.js"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}

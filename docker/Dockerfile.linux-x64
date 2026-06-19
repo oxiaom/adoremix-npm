@@ -1,0 +1,174 @@
+# syntax=docker/dockerfile:1.4
+#
+# 在 x64 主机上 native 编译 Linux x64 AdoreMix（无需 QEMU，速度比 ARM64 快 5-10 倍）。
+# 用法见 docker/build-linux-x64.sh。
+
+FROM ubuntu:22.04
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG ADORE_VERSION=8.0.17
+ARG TARGET_BIN=AdoreMixV8.0.17_console_linuxx64
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        qtbase5-dev \
+        qtbase5-private-dev \
+        qttools5-dev \
+        libqt5websockets5-dev \
+        qtmultimedia5-dev \
+        libqt5multimedia5-plugins \
+        libqt5sql5-mysql \
+        libqt5sql5-sqlite \
+        libqt5svg5 \
+        libssl-dev \
+        libhiredis-dev \
+        libopus-dev \
+        libopusfile-dev \
+        libmp3lame-dev \
+        libmariadb-dev \
+        libsqlite3-dev \
+        file \
+        patchelf \
+        wget \
+        ca-certificates \
+        git \
+    && rm -rf /var/lib/apt/lists/*
+
+# 验证 Qt 关键库
+RUN test -f /usr/lib/x86_64-linux-gnu/libQt5Core.so.5 && \
+    which qmake && \
+    qmake -query QT_INSTALL_LIBS && \
+    qmake -query QT_INSTALL_PLUGINS
+
+# 拷源码
+COPY . /src
+WORKDIR /src
+
+# 0) 清理 Windows 上的 Qt Creator / 旧编译残留
+RUN find /src \( \
+        -name '.qmake.stash' -o \
+        -name '*.pro.user' -o \
+        -name '*.pro.user.*' -o \
+        -name 'Makefile' -o \
+        -name 'Makefile.Debug' -o \
+        -name 'Makefile.Release' -o \
+        -name '.moc' -o \
+        -name '.uic' -o \
+        -name '.rcc' -o \
+        -name '.obj' -o \
+        -name 'mkspecs' -o \
+        -name 'build-*' -o \
+        -name 'debug' -o \
+        -name 'release' -o \
+        -name '*.o' -o \
+        -name '*.obj' -o \
+        -name '*.a' -o \
+        -name 'libsqlitecipher.so' -o \
+        -name 'libsqlitecipher.so.*' \
+    \) -prune -exec rm -rf {} + 2>/dev/null ; \
+    echo "=== /src 清理完成 ==="
+
+# 0.5) 修复 Windows→Linux 大小写敏感（severinit.h vs Severinit.h）
+RUN find /src -type f \( -name '*.h' -o -name '*.cpp' -o -name '*.hpp' \) | while read f; do \
+        dir=$(dirname "$f"); \
+        base=$(basename "$f"); \
+        lower=$(echo "$base" | tr 'A-Z' 'a-z'); \
+        if [ "$base" != "$lower" ] && [ ! -e "$dir/$lower" ]; then \
+            ln -s "$base" "$dir/$lower"; \
+        fi; \
+    done ; \
+    echo "=== 大小写符号链接创建完成 ==="
+
+# 1) 编译 QtCipherSqlitePlugin
+RUN SUBDIR=$(ls -d QtCipherSqlitePlugin-develop/QtCipherSqlitePlugin-develop 2>/dev/null || echo QtCipherSqlitePlugin-develop) && \
+    if [ -d "$SUBDIR" ] && [ -f "$SUBDIR/QtCipherSqlitePlugin.pro" ]; then \
+        find "$SUBDIR" -name 'Makefile' -delete ; \
+        find "$SUBDIR" -name 'Makefile.Debug' -delete ; \
+        find "$SUBDIR" -name 'Makefile.Release' -delete ; \
+        cd "$SUBDIR/sqlitecipher" && \
+        qmake sqlitecipher.pro && \
+        make -j$(nproc) && \
+        SO_PATH=$(find . -name 'libsqlitecipher.so' | head -1) && \
+        cp "$SO_PATH" /usr/lib/x86_64-linux-gnu/ && \
+        chmod 0755 /usr/lib/x86_64-linux-gnu/libsqlitecipher.so && \
+        ldconfig && \
+        QT_PLUGINS=$(qmake -query QT_INSTALL_PLUGINS) && \
+        mkdir -p $QT_PLUGINS/sqldrivers && \
+        cp "$SO_PATH" $QT_PLUGINS/sqldrivers/ ; \
+    else \
+        echo "警告：QtCipherSqlitePlugin 源码未找到" ; \
+    fi
+
+# 2) 修复 .pro 硬编码路径 + 改 TARGET
+RUN sed -i \
+        -e 's|-L/opt/qt5\.[0-9][^ ]*plugins/sqldrivers||g' \
+        -e 's|AdoreMixV8\.0\.17_console_linuxarm0|'${TARGET_BIN}'|g' \
+        AdoreMix.pro && \
+    grep -E '^(TARGET|LIBS)' AdoreMix.pro
+
+# 3) 编译主程序（x64 native，比 QEMU 快很多）
+RUN qmake AdoreMix.pro && make -j$(nproc)
+
+# 4) 验证二进制
+RUN test -f ${TARGET_BIN} && \
+    ls -la ${TARGET_BIN} && \
+    file ${TARGET_BIN}
+
+# 5) 收集产物
+RUN mkdir -p /out /out/lib /out/platforms /out/sqldrivers \
+             /out/bearer /out/iconengines /out/imageformats \
+             /out/translations /out/mediaservice /out/audio \
+             /out/etc /out/conf /out/html \
+             /out/logs /out/var /out/dmp /out/tty /out/temp
+
+RUN cp ${TARGET_BIN} /out/ && chmod 0755 /out/${TARGET_BIN}
+
+# Qt 运行时
+RUN QT_LIB=$(qmake -query QT_INSTALL_LIBS) && \
+    for lib in libQt5Core libQt5Network libQt5Sql libQt5WebSockets \
+               libQt5Multimedia libQt5Svg libQt5Concurrent libQt5Xml \
+               libQt5MultimediaGstTools libQt5OpenGL libQt5DBus; do \
+        cp $QT_LIB/${lib}.so* /out/lib/ 2>/dev/null || true ; \
+    done
+
+# Qt plugins
+RUN QT_PLUGINS=$(qmake -query QT_INSTALL_PLUGINS) && \
+    for sub in platforms sqldrivers bearer iconengines imageformats mediaservice audio; do \
+        rm -rf /out/$sub && \
+        (cp -r $QT_PLUGINS/$sub /out/$sub 2>/dev/null || mkdir -p /out/$sub) ; \
+    done && \
+    mkdir -p /out/translations && \
+    cp /usr/share/qt5/translations/qtbase_*.qm /out/translations/ 2>/dev/null || true
+
+# 第三方库
+RUN for lib in libhiredis libopus libopusfile libmp3lame libssl libcrypto \
+               libsqlite3 libmariadb libstdc++ libgcc_s; do \
+        find /usr/lib -name "${lib}*.so*" -exec cp -a {} /out/lib/ \; 2>/dev/null ; \
+    done
+
+# qt.conf
+RUN printf '[Paths]\nPlugins=./\nLibraries=./lib\n' > /out/qt.conf
+
+# 业务资源
+RUN cp -r etc /out/etc 2>/dev/null || mkdir -p /out/etc ; \
+    cp -r conf /out/conf 2>/dev/null || mkdir -p /out/conf ; \
+    cp -r html /out/html 2>/dev/null || mkdir -p /out/html ; \
+    for f in tts.js find.js findsc.js xiaoboshu.py; do \
+        [ -f "$f" ] && cp "$f" /out/ ; \
+    done ; \
+    which lame && cp $(which lame) /out/lame && chmod 0755 /out/lame || true
+
+# patchelf + symlink 解引用
+RUN cd /out && patchelf --set-rpath '$ORIGIN/lib' ${TARGET_BIN} 2>/dev/null || true
+RUN find /out -type l -exec sh -c 'target=$(readlink -f "$1") && [ -n "$target" ] && rm "$1" && cp "$target" "$1"' _ {} \; 2>/dev/null ; \
+    find /out -xtype l -delete 2>/dev/null
+
+# 验证依赖
+RUN cd /out && (ldd ${TARGET_BIN} | grep "not found" && echo "警告：有未解决的依赖" && exit 1 || echo "依赖完整")
+
+# 元信息
+RUN printf '{"version":"%s","platform":"linux","arch":"x64","bin":"%s","builtAt":"%s"}\n' \
+        "${ADORE_VERSION}" "${TARGET_BIN}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        > /out/.adoremix-native.json
+
+CMD ["bash", "-c", "find /out -maxdepth 2 -type f | sort"]

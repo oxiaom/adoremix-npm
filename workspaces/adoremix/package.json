@@ -1,0 +1,50 @@
+{
+  "name": "@oxiaom/adoremix",
+  "version": "1.0.1",
+  "description": "AdoreMix broadcast server - cross-platform installer, runner and service manager",
+  "bin": {
+    "adoremix": "./bin/adoremix.js"
+  },
+  "main": "./src/index.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=16"
+  },
+  "optionalDependencies": {
+    "@oxiaom/adoremix-win32-x64": "^1.0.0",
+    "@oxiaom/adoremix-linux-x64": "^1.0.0",
+    "@oxiaom/adoremix-linux-arm64": "^1.0.0",
+    "@oxiaom/adoremix-linux-arm": "^1.0.0"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "ini": "^4.1.3",
+    "pidusage": "^3.0.2",
+    "fs-extra": "^11.2.0",
+    "prompts": "^2.4.2"
+  },
+  "peerDependencies": {
+    "node-windows": "^1.0.0-beta.8"
+  },
+  "peerDependenciesMeta": {
+    "node-windows": {
+      "optional": true
+    }
+  },
+  "scripts": {
+    "postinstall": "node ./bin/postinstall-hint.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "templates"
+  ],
+  "keywords": [
+    "adoremix",
+    "broadcast",
+    "server",
+    "qt",
+    "installer"
+  ],
+  "license": "MIT"
+}

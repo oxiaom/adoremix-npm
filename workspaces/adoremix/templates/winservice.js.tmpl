@@ -1,0 +1,66 @@
+'use strict';
+// 该文件由 `adoremix service install` 在工作目录生成。
+// 它通过 node-windows 创建/卸载 Windows 服务。
+// 用法：node winservice.js install|uninstall
+
+const Service = require('node-windows').Service;
+const path = require('path');
+
+const WORKDIR = '__WORKDIR__';
+const NODE = '__NODE__';
+const CLI = '__CLI__';
+const SVC_NAME = 'AdoreMixService';
+const SVC_DESC = 'AdoreMix Broadcast Server';
+
+const svc = new Service({
+  name: SVC_NAME,
+  description: SVC_DESC,
+  script: CLI,
+  execPath: NODE,
+  args: ['start', '--daemon', '--workdir', WORKDIR],
+  cwd: WORKDIR,
+  env: [{
+    name: 'NODE_ENV',
+    value: 'production'
+  }]
+});
+
+svc.on('install', () => {
+  console.log(`[ok] 服务已安装：${SVC_NAME}`);
+  svc.start();
+});
+
+svc.on('alreadyinstalled', () => {
+  console.log(`[warn] 服务已存在：${SVC_NAME}`);
+});
+
+svc.on('start', () => {
+  console.log(`[ok] 服务已启动：${SVC_NAME}`);
+});
+
+svc.on('stop', () => {
+  console.log(`[ok] 服务已停止：${SVC_NAME}`);
+});
+
+svc.on('uninstall', () => {
+  console.log(`[ok] 服务已卸载：${SVC_NAME}`);
+});
+
+svc.on('error', (err) => {
+  console.error(`[err] node-windows 错误：${err.message}`);
+  process.exit(1);
+});
+
+const cmd = process.argv[2] || 'install';
+if (cmd === 'install') {
+  svc.install();
+} else if (cmd === 'uninstall') {
+  svc.uninstall();
+} else if (cmd === 'start') {
+  svc.start();
+} else if (cmd === 'stop') {
+  svc.stop();
+} else {
+  console.error('用法：node winservice.js install|uninstall|start|stop');
+  process.exit(1);
+}

@@ -1,0 +1,7 @@
+.github/
+scripts/
+_tmp/
+_sources/
+*.log
+.gitignore
+adoremix-monorepo.iml

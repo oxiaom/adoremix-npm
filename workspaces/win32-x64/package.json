@@ -1,0 +1,17 @@
+{
+  "name": "@oxiaom/adoremix-win32-x64",
+  "version": "1.0.1",
+  "description": "AdoreMix native binaries and resources for Windows x64",
+  "main": "./index.js",
+  "_publish_os": [
+    "win32"
+  ],
+  "_publish_cpu": [
+    "x64"
+  ],
+  "files": [
+    "index.js",
+    "native"
+  ],
+  "license": "MIT"
+}

@@ -1,0 +1,107 @@
+name: build-linux
+
+# 构建 Linux 3 个平台（x64/arm64/arm）的 AdoreMix 原生二进制并 commit 回 main 分支。
+#
+# 触发方式：
+#   - 手动 workflow_dispatch，输入 Adore_mix2 源码的下载 URL 或 GitHub repo
+#   - push tag v* 时自动触发（用 main 分支的最新源码 cache）
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_url:
+        description: 'Adore_mix2 源码 tar.gz 下载 URL（GitHub release asset 等）'
+        required: true
+      version:
+        description: '版本号（用于日志，不影响 commit）'
+        required: false
+        default: '1.0.0'
+  workflow_call:
+    inputs:
+      source_url:
+        type: string
+        required: true
+      version:
+        type: string
+        required: false
+        default: '1.0.0'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64
+            dockerfile: docker/Dockerfile.linux-x64
+            build_args: --platform linux/amd64
+          - platform: linux-arm64
+            dockerfile: docker/Dockerfile.linux-arm64
+            build_args: --platform linux/arm64
+          - platform: linux-arm
+            dockerfile: docker/Dockerfile.linux-arm
+            build_args: --platform linux/arm/v7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up QEMU（仅 arm64/arm 需要）
+        if: matrix.platform != 'linux-x64'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64,arm
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Download source
+        run: |
+          mkdir -p _src/Adore_mix2
+          curl -L -o _src/adoremix.tar.gz "${{ inputs.source_url }}"
+          tar -xzf _src/adoremix.tar.gz -C _src/Adore_mix2 --strip-components=0
+          test -f _src/Adore_mix2/AdoreMix.pro
+
+      - name: Build ${{ matrix.platform }} image
+        run: |
+          docker buildx build \
+            ${{ matrix.build_args }} \
+            --tag adoremix-${{ matrix.platform }}-builder:ci \
+            --file ${{ matrix.dockerfile }} \
+            --load \
+            _src/Adore_mix2
+
+      - name: Extract /out
+        run: |
+          cid=$(docker create adoremix-${{ matrix.platform }}-builder:ci)
+          mkdir -p workspaces/${{ matrix.platform }}/native
+          find workspaces/${{ matrix.platform }}/native -mindepth 1 ! -name README.md -delete 2>/dev/null || true
+          docker cp "$cid:/out/." workspaces/${{ matrix.platform }}/native/
+          docker rm "$cid"
+          ls workspaces/${{ matrix.platform }}/native | head -10
+
+      - name: Verify binary architecture
+        run: |
+          docker run --rm adoremix-${{ matrix.platform }}-builder:ci file /out/AdoreMix* | tee /dev/stderr
+
+      - name: Commit artifacts
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add workspaces/${{ matrix.platform }}/native
+          if git diff --cached --quiet; then
+            echo "无变化，跳过 commit"
+          else
+            git commit -m "ci(${{ matrix.platform }}): rebuild native from ${{ inputs.version }}"
+            git push
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}-native
+          path: workspaces/${{ matrix.platform }}/native
+          retention-days: 7

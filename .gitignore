@@ -1,0 +1,12 @@
+node_modules/
+*.log
+.DS_Store
+Thumbs.db
+_sources/
+_tmp/
+# 注意：workspaces/*/native/ 不忽略（构建产物要进 repo，CI 才能 commit + publish）
+workspaces/*/native/.adoremix-installed
+workspaces/adoremix/workdir-test/
+.env
+.env.local
+*.bat.local
