@@ -158,6 +158,44 @@ async function setupNetwork(workdir, opts) {
   return 0;
 }
 
+async function setupLog(workdir, opts) {
+  opts = opts || {};
+  const cfg = require('./index');
+  const KEY = 'Settings.isopenrizhi';
+  let val;
+  if (opts.enable !== undefined) {
+    val = !!opts.enable;
+  } else if (opts.interactive === false) {
+    val = false;
+  } else {
+    const cur = cfg.getConfigValue(workdir, KEY);
+    logger.log('');
+    logger.log('=== 日志开关 (isopenrizhi) ===');
+    logger.log('开启后：');
+    logger.log('  • 记录所有播放日志');
+    logger.log('  • 实时喊话推流的语音/音频自动保存为 mp3');
+    logger.log('注意：长期开启会占用大量磁盘空间');
+    logger.log(`当前：${cur ? '开启' : '关闭'}`);
+    logger.log('');
+    const resp = await prompts({
+      type: 'toggle',
+      name: 'val',
+      message: '是否开启日志',
+      initial: !!cur,
+      active: '开启',
+      inactive: '关闭'
+    });
+    val = resp.val;
+  }
+  cfg.setConfigValue(workdir, KEY, val);
+  logger.ok(`isopenrizhi = ${val}`);
+  if (val) {
+    logger.warn('日志已开启，长期运行会占用磁盘，建议定期清理 tty/ 和 logs/');
+  }
+  logger.log('改完后记得：adoremix restart');
+  return 0;
+}
+
 async function setupPreurl(workdir, opts) {
   opts = opts || {};
   const cfg = require('./index');
@@ -211,6 +249,7 @@ async function setupPreurl(workdir, opts) {
 module.exports = {
   setupNetwork,
   setupPreurl,
+  setupLog,
   listInterfaces,
   isValidIPv4,
   isPreurlCdn,

@@ -4,7 +4,7 @@ module.exports = {
   Settings: {
     ISLOCALHOST: false,
     wbport: 6082,
-    isopenrizhi: true,
+    isopenrizhi: false,
     exename: '',
     Meida_port: 6002,
     Meida_ip: '127.0.0.1',

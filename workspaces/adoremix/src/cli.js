@@ -147,6 +147,25 @@ function buildProgram() {
       process.exitCode = code || 0;
     });
 
+  config
+    .command('log')
+    .description('日志开关 isopenrizhi（开启会保存播放日志 + mp3，长期会占存储）')
+    .option('--workdir <path>')
+    .option('--enable', '开启日志')
+    .option('--disable', '关闭日志（默认）')
+    .option('--no-interactive', '不询问')
+    .action(async (opts) => {
+      const net = require('./config/network');
+      let enable;
+      if (opts.enable) enable = true;
+      else if (opts.disable) enable = false;
+      const code = await net.setupLog(resolveWorkdir(opts.workdir), {
+        enable,
+        interactive: opts.interactive !== false
+      });
+      process.exitCode = code || 0;
+    });
+
   const runner = require('./runner');
   const nativeRef = () => {
     try { return paths.loadNative(); }
