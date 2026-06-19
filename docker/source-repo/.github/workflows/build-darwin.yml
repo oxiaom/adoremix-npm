@@ -64,6 +64,7 @@ jobs:
 
       - name: Compile QtCipherSqlitePlugin (nested directory)
         run: |
+          set -e
           QT_PLUGIN_DIR=$(qmake -query QT_INSTALL_PLUGINS)
           echo "Qt plugins dir: $QT_PLUGIN_DIR"
           # 源码里是双层嵌套：QtCipherSqlitePlugin-develop/QtCipherSqlitePlugin-develop/
@@ -71,33 +72,45 @@ jobs:
           if [ -z "$QT_CIPHER_DIR" ]; then
             QT_CIPHER_DIR=$(find . -maxdepth 3 -type d -name "QtCipherSqlitePlugin" | head -1)
           fi
-          if [ -n "$QT_CIPHER_DIR" ]; then
-            echo "Found QtCipherSqlitePlugin at: $QT_CIPHER_DIR"
-            cd "$QT_CIPHER_DIR"
-            # 如果还是嵌套，再进一层
-            if [ -d "QtCipherSqlitePlugin-develop" ]; then
-              cd QtCipherSqlitePlugin-develop
-            fi
-            # 修正 .qmake.conf / .qmake.stash（如果有）指向当前 Qt
-            rm -f .qmake.stash
-            qmake
-            make -j$(sysctl -n hw.ncpu) 2>&1 | tail -30
-            # 找到编译出的 .dylib
-            DYLIB=$(find . -name "libsqlitecipher*.dylib" -type f | head -1)
-            if [ -z "$DYLIB" ]; then
-              DYLIB=$(find . -name "libsqlitecipher*.so" -type f | head -1)
-            fi
-            if [ -n "$DYLIB" ]; then
-              mkdir -p "$QT_PLUGIN_DIR/sqldrivers"
-              cp -v "$DYLIB" "$QT_PLUGIN_DIR/sqldrivers/"
-              echo "✓ QtCipherSqlitePlugin installed"
-            else
-              echo "❌ QtCipherSqlitePlugin 没编译出 dylib"
-              exit 1
-            fi
-          else
+          if [ -z "$QT_CIPHER_DIR" ]; then
             echo "❌ 找不到 QtCipherSqlitePlugin 目录"
             find . -maxdepth 3 -type d -name "*Cipher*" -o -name "*cipher*"
+            exit 1
+          fi
+          echo "Found QtCipherSqlitePlugin at: $QT_CIPHER_DIR"
+          cd "$QT_CIPHER_DIR"
+          # 如果还是嵌套，再进一层
+          if [ -d "QtCipherSqlitePlugin-develop" ]; then
+            cd QtCipherSqlitePlugin-develop
+          fi
+
+          # 关键：清理所有跨平台残留的 build artifacts
+          # 源码树里带着 Linux ARM 编译过的 .o / .so / Makefile / .qmake.stash，
+          # 会让 macOS 链接器报 "unknown file type in '.obj/smain.o'"
+          echo "清理跨平台残留 build artifacts..."
+          find . -type f \( -name "*.o" -o -name "*.obj" -o -name "*.so" -o -name "*.dylib" -o -name "*.a" \) -delete
+          find . -type f \( -name "Makefile" -o -name "Makefile.Debug" -o -name "Makefile.Release" \) -delete
+          find . -type f \( -name ".qmake.stash" -o -name "*.prl" \) -delete
+          rm -rf .obj build release debug 2>/dev/null || true
+          # 残留的 .pri 可能含硬编码 /opt/qt5.9.1-arm 路径，删掉让 qmake 重新生成
+          find sqlitecipher/mkspecs -type f -delete 2>/dev/null || true
+
+          # 清理可能的旧安装（让 qmake 重装正确的 macOS 版本）
+          rm -f "$QT_PLUGIN_DIR/sqldrivers/libsqlitecipher."* 2>/dev/null || true
+
+          qmake
+          make -j$(sysctl -n hw.ncpu)
+
+          # 找到编译出的 .dylib（必须是真 macOS dylib，不能是 .so）
+          DYLIB=$(find . -name "libsqlitecipher*.dylib" -type f | head -1)
+          if [ -n "$DYLIB" ]; then
+            file "$DYLIB"
+            mkdir -p "$QT_PLUGIN_DIR/sqldrivers"
+            cp -v "$DYLIB" "$QT_PLUGIN_DIR/sqldrivers/"
+            echo "✓ QtCipherSqlitePlugin installed"
+          else
+            echo "❌ QtCipherSqlitePlugin 没编译出 dylib"
+            find . -name "libsqlitecipher*" -type f 2>/dev/null
             exit 1
           fi
 
@@ -136,6 +149,12 @@ jobs:
 
       - name: qmake + make
         run: |
+          set -o pipefail
+          # 清理跨平台残留（Linux ARM 的 Makefile/.o/等会让 macOS 编译失败）
+          find . -maxdepth 2 -type f \( -name "Makefile" -o -name "Makefile.Debug" -o -name "Makefile.Release" -o -name ".qmake.stash" \) -delete
+          find . -maxdepth 2 -type f -name "*.o" -delete
+          rm -rf release debug 2>/dev/null || true
+
           qmake AdoreMix.pro -spec macx-clang CONFIG+=release
           make -j$(sysctl -n hw.ncpu) 2>&1 | tee build.log | tail -100
 
