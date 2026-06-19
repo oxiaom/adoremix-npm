@@ -162,6 +162,31 @@ function runDoctor(workdir, opts) {
     logger.log(`○ 服务未运行（adoremix start 启动）`);
   }
 
+  // 8. TTS provider 依赖检查
+  logger.log('');
+  logger.log('=== TTS Provider 检查 ===');
+  const cfg = require('./config');
+  const cfgObj = cfg.readConfig(workdir) || {};
+  const ttsDeps = require('./tts-deps');
+  const providerName = (cfgObj.TTS && cfgObj.TTS.provider) || 'xf';
+  logger.log(`当前 provider: ${providerName}`);
+  const ttsResult = ttsDeps.checkDeps(workdir, providerName, cfgObj);
+  if (ttsResult.issues.length === 0) {
+    logger.ok(`✓ ${providerName} provider 所有依赖就绪`);
+  } else {
+    for (const iss of ttsResult.issues) {
+      const mark = iss.severity === 'error' ? '❌' : '⚠';
+      logger.log(`  ${mark} ${iss.msg}`);
+      if (iss.fixCmd) logger.log(`     修复：${iss.fixCmd}`);
+      if (iss.autoFixable) issues.push({ type: 'tts', severity: iss.severity, msg: iss.msg, fixCmd: iss.fixCmd });
+    }
+    if (opts.fix) {
+      logger.info('==> 自动修复 TTS 依赖...');
+      const r = ttsDeps.fixDeps(workdir, ttsResult.issues, { sudo: process.getuid && process.getuid() === 0 });
+      logger.ok(`✓ 修复 ${r.fixed} 项，失败 ${r.failed} 项`);
+    }
+  }
+
   return reportAndExit(issues, opts);
 }
 

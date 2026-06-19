@@ -64,10 +64,12 @@ async function main() {
   const outFile = path.join(ttyDir, mp3Name);
 
   // 凭证：优先 config.ini，命令行参数兼容旧版 xf
+  // 兼容 Qt 已有字段：Settings.ttsxfAPPID / ttsxfAPISecret / ttsxfAPIKey
+  const settings = cfg.Settings || {};
   const creds = {
-    xf_appid: ttsSection.xf_appid || appidArg || '',
-    xf_apiSecret: ttsSection.xf_apiSecret || apiSecretArg || '',
-    xf_apiKey: ttsSection.xf_apiKey || apiKeyArg || '',
+    xf_appid: ttsSection.xf_appid || settings.ttsxfAPPID || appidArg || '',
+    xf_apiSecret: ttsSection.xf_apiSecret || settings.ttsxfAPISecret || apiSecretArg || '',
+    xf_apiKey: ttsSection.xf_apiKey || settings.ttsxfAPIKey || apiKeyArg || '',
     xf_voice_override: ttsSection.xf_voice_override || '',
     minimax_token: ttsSection.minimax_token || '',
     edge_voice_override: ttsSection.edge_voice_override || ''
