@@ -110,7 +110,18 @@ jobs:
             echo "无变化，跳过 commit"
           else
             git commit -m "ci(${{ matrix.platform }}): rebuild native from ${{ inputs.version }}"
-            git push
+            # 多个 matrix job 并行 commit main，可能冲突，最多重试 5 次
+            for i in 1 2 3 4 5; do
+              if git push 2>&1; then
+                echo "push 成功"
+                exit 0
+              fi
+              echo "==> push 失败（可能并发冲突），retry $i/5..."
+              git pull --rebase origin main || git rebase --abort
+              sleep $((i * 5))
+            done
+            echo "重试 5 次仍失败"
+            exit 1
           fi
 
       - name: Upload artifact
