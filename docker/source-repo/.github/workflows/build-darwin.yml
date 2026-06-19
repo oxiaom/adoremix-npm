@@ -101,10 +101,13 @@ jobs:
           # ARM64 上 sqlite3mc_amalgamation.c 用 ARM AES 内联函数（vaeseq_u8 等），
           # clang 默认编译不带 aes feature，会报 'vaeseq_u8 requires target feature aes'。
           # SQLITE_OMIT_AES_* 不被 sqlite3mc respect，必须开启 aes target feature。
-          # -mcpu=apple-m1 不自动带 crypto，必须 -march=armv8-a+aes 显式开 aes feature
+          # sqlite3mc 的 AES 函数用 FUNC_ISA 宏加 target attribute，但宏默认空。
+          # 定义 USE_CLANG_ATTR_TARGET_AARCH64 让宏生效：
+          #   #define FUNC_ISA __attribute__((target("neon,crypto")))
+          # 这样 AES 函数会被 clang 用 crypto feature 单独编译。
           EXTRA_FLAGS=""
           if [ "${{ matrix.arch }}" = "arm64" ]; then
-            EXTRA_FLAGS='-march=armv8-a+aes'
+            EXTRA_FLAGS='-DUSE_CLANG_ATTR_TARGET_AARCH64'
           fi
 
           qmake "QMAKE_CFLAGS += $EXTRA_FLAGS" "QMAKE_CXXFLAGS += $EXTRA_FLAGS"
