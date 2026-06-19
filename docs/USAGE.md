@@ -55,7 +55,8 @@ adoremix start --daemon
 | Linux | x64 | ✅ |
 | Linux | ARM64 (aarch64) | ✅ |
 | Linux | ARM (armv7/armhf) | ✅ |
-| macOS | - | ❌ 暂不支持 |
+| macOS | x64 (Intel) | ✅ |
+| macOS | ARM64 (Apple Silicon) | ✅ |
 
 **软件要求**：
 - Node.js ≥ 16（推荐 20 LTS）
@@ -122,6 +123,20 @@ adoremix install --no-interactive           # 跳过配置向导，用默认值
 - Linux root 用户：`/opt/adoremix`
 - Linux 普通用户：`~/.local/share/adoremix`
 - Windows：`C:\ProgramData\adoremix`
+- macOS：`~/.local/share/adoremix`（或 `/opt/adoremix`，需 sudo）
+
+### macOS 首次运行注意事项
+
+macOS 二进制首次启动可能被 Gatekeeper 拦截，出现"无法验证开发者"提示。处理方法：
+
+```bash
+# 方案 1：移除 quarantine 属性（推荐）
+xattr -d com.apple.quarantine /path/to/workdir/AdoreMixV8.0.17_console_darwin*
+
+# 方案 2：系统偏好设置 → 安全性与隐私 → 允许打开
+```
+
+`adoremix start` 在 macOS 上完全可用（前台 + 后台）。`adoremix service install`（开机自启）暂不支持 macOS，建议用 `adoremix start --daemon` 配合 `~/Library/LaunchAgents/*.plist` 手动管理。
 
 ---
 
@@ -632,7 +647,9 @@ adoremix version   # 应 ≥ 1.0.18
 
 ### Q: macOS 支持吗？
 
-暂不支持。如果需要，可以在 macOS 上用 Qt 5.15 编译 AdoreMix 源码，手动放到工作目录。
+**支持**（v1.0.19+）。`npm install -g @oxiaom/adoremix` 在 macOS Intel（x64）和 Apple Silicon（arm64）上都可正常安装运行。首次启动若被 Gatekeeper 拦截，运行 `xattr -d com.apple.quarantine <二进制路径>` 即可。
+
+注意：macOS 上 `adoremix service install`（开机自启）暂未实现，用 `adoremix start --daemon` 替代。
 
 ### Q: 多个 AdoreMix 实例能共存吗？
 

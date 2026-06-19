@@ -1,0 +1,106 @@
+# ===== Qt build artifacts =====
+*.o
+*.obj
+*.a
+*.lib
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+*.moc
+*.rcc
+Makefile
+Makefile.Debug
+Makefile.Release
+*.prl
+*.app/
+
+# ===== AdoreMix build output =====
+AdoreMix*
+!AdoreMix.pro
+!AdoreMix*.cpp
+!AdoreMix*.h
+
+# 不小心提交的二进制（按完整名字排除）
+AdoreMixV8*
+AdoreMix64*
+AdoreMixV8X*
+AdoreMixV8X.exe
+
+# ===== Qt Creator / IDE =====
+*.user
+*.user.*
+*.pro.user*
+*.qbs.user*
+*.autosave
+*.qmlproject.user*
+*.plg
+*.wp4
+*.kdev4
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ===== macOS metadata =====
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# ===== Windows metadata + binaries =====
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ===== Logs / runtime data =====
+*.log
+logs/
+dmp/
+tty/
+temp/
+var/
+*.pid
+*.sqlite-journal
+*.sqlite-shm
+*.sqlite-wal
+
+# ===== Third-party build outputs =====
+QtCipherSqlitePlugin/build/
+QtCipherSqlitePlugin/*.o
+QtCipherSqlitePlugin/*.dylib
+QtCipherSqlitePlugin/*.so
+QtCipherSqlitePlugin/*.dll
+
+# ===== Dependency dirs =====
+node_modules/
+package-lock.json
+yarn.lock
+
+# ===== Local config overrides =====
+config.local.ini
+.env
+.env.local
+
+# ===== Packaging output =====
+_deploy/
+_out/
+build/
+dist/
+*.tar.gz
+*.zip
+!docker/**/*.tar.gz
+
+# ===== Debug symbol files =====
+*.pdb
+*.ilk
+*.map
+*.debug
+
+# ===== Temporary editor files =====
+*.bak
+*.orig
+*.rej
+*.tmp

@@ -1,0 +1,106 @@
+name: pull-darwin-artifacts
+
+# 从【私有源码仓库】（默认 oxiaom/adoremix-source）下载 macOS 二进制 release 产物，
+# 解压到 workspaces/darwin-{x64,arm64}/native/，commit 到 main 分支。
+#
+# 源码仓库的 build-darwin.yml 完成编译后会发布 v<version> tag + 两个 tar.gz asset：
+#   - adoremix-darwin-x64-<version>.tar.gz
+#   - adoremix-darwin-arm64-<version>.tar.gz
+#
+# 这个 workflow 拉到 npm 公开仓库后，由 publish.yml 把子包发到 npm registry。
+#
+# 触发：手动 workflow_dispatch，输入版本号（必须匹配源码仓库已有的 release tag）
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（对应源码仓库的 release tag，例如 1.0.19）'
+        required: true
+      source_repo:
+        description: '源码仓库（owner/repo，默认 oxiaom/adoremix-source）'
+        required: false
+        default: 'oxiaom/adoremix-source'
+
+jobs:
+  pull:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: darwin-x64
+            arch: x64
+          - platform: darwin-arm64
+            arch: arm64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download ${{ matrix.platform }} tarball from source repo
+        env:
+          GH_TOKEN: ${{ secrets.SOURCE_REPO_TOKEN }}
+        run: |
+          VERSION="${{ inputs.version }}"
+          SOURCE_REPO="${{ inputs.source_repo }}"
+          TGZ="adoremix-${{ matrix.platform }}-${VERSION}.tar.gz"
+          echo "拉取 $SOURCE_REPO@v$VERSION / $TGZ"
+          gh release download "v${VERSION}" \
+            --repo "$SOURCE_REPO" \
+            --pattern "$TGZ" \
+            --dir _dl/
+          ls -lh _dl/
+          shasum -a 256 _dl/"$TGZ"
+
+      - name: Extract to workspaces/${{ matrix.platform }}/native/
+        run: |
+          VERSION="${{ inputs.version }}"
+          TGZ="adoremix-${{ matrix.platform }}-${VERSION}.tar.gz"
+          mkdir -p workspaces/${{ matrix.platform }}/native
+          # 保留 README.md（占位），其他全清掉
+          find workspaces/${{ matrix.platform }}/native -mindepth 1 ! -name README.md -delete 2>/dev/null || true
+          tar -xzf "_dl/$TGZ" -C workspaces/${{ matrix.platform }}/native/
+          ls -la workspaces/${{ matrix.platform }}/native | head -20
+
+      - name: Verify binary
+        run: |
+          BIN=$(find workspaces/${{ matrix.platform }}/native -maxdepth 1 -type f -name "AdoreMix*" 2>/dev/null | head -1)
+          if [ -z "$BIN" ]; then
+            echo "❌ 没找到 AdoreMix 二进制"
+            ls workspaces/${{ matrix.platform }}/native
+            exit 1
+          fi
+          file "$BIN"
+
+      - name: Commit artifacts
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add workspaces/${{ matrix.platform }}/native
+          if git diff --cached --quiet; then
+            echo "无变化，跳过 commit"
+          else
+            git commit -m "ci(${{ matrix.platform }}): pull native v${{ inputs.version }} from source repo"
+            # 并发 push 冲突重试 5 次
+            for i in 1 2 3 4 5; do
+              if git push 2>&1; then
+                echo "push 成功"
+                exit 0
+              fi
+              echo "==> push 失败（可能并发冲突），retry $i/5..."
+              git pull --rebase origin main || git rebase --abort
+              sleep $((i * 5))
+            done
+            echo "重试 5 次仍失败"
+            exit 1
+          fi
+
+      - name: Upload artifact (for verification)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}-native
+          path: workspaces/${{ matrix.platform }}/native
+          retention-days: 7

@@ -1,6 +1,6 @@
 {
   "name": "@oxiaom/adoremix",
-  "version": "1.0.18",
+  "version": "1.0.19",
   "description": "AdoreMix broadcast server - cross-platform installer, runner and service manager",
   "bin": {
     "adoremix": "./bin/adoremix.js"
@@ -14,7 +14,9 @@
     "@oxiaom/adoremix-win32-x64": "^1.0.0",
     "@oxiaom/adoremix-linux-x64": "^1.0.0",
     "@oxiaom/adoremix-linux-arm64": "^1.0.0",
-    "@oxiaom/adoremix-linux-arm": "^1.0.0"
+    "@oxiaom/adoremix-linux-arm": "^1.0.0",
+    "@oxiaom/adoremix-darwin-x64": "^1.0.0",
+    "@oxiaom/adoremix-darwin-arm64": "^1.0.0"
   },
   "dependencies": {
     "commander": "^12.1.0",

@@ -7,7 +7,7 @@
 
 ## ✨ 特性
 
-- 🎯 **一键部署** — `npm install -g @oxiaom/adoremix` 跨 4 平台（Windows / Linux x64 / ARM64 / ARM）
+- 🎯 **一键部署** — `npm install -g @oxiaom/adoremix` 跨 6 平台（Windows / Linux x64 / ARM64 / ARM / macOS x64 / macOS ARM64）
 - 🔊 **多 TTS 引擎** — 讯飞 / MiniMax / Edge TTS 三选一，配置切换零代码改动
 - 🌐 **双 WebUI** — 低码率（16k，WiFi/互联网）+ 高码率（44.1k，局域网）一键切换
 - 🚀 **开机自启** — Linux systemd / Windows Service 自动注册
@@ -86,6 +86,8 @@ adoremix service install
 | Linux | x64 | `@oxiaom/adoremix-linux-x64` |
 | Linux | ARM64 | `@oxiaom/adoremix-linux-arm64` |
 | Linux | ARM (armhf) | `@oxiaom/adoremix-linux-arm` |
+| macOS | x64 (Intel) | `@oxiaom/adoremix-darwin-x64` |
+| macOS | ARM64 (Apple Silicon) | `@oxiaom/adoremix-darwin-arm64` |
 
 npm 会自动按当前平台拉对应子包，**不用手动选**。
 
@@ -116,8 +118,11 @@ adoremix-npm/
 │   ├── win32-x64/         # Windows 原生包
 │   ├── linux-x64/         # Linux x64 原生包
 │   ├── linux-arm64/       # Linux ARM64 原生包
-│   └── linux-arm/         # Linux ARM 原生包
-├── docker/                # Docker 构建脚本（4 平台）
+│   ├── linux-arm/         # Linux ARM 原生包
+│   ├── darwin-x64/        # macOS Intel 原生包
+│   └── darwin-arm64/      # macOS Apple Silicon 原生包
+├── docker/                # Docker 构建脚本（Linux 4 平台）
+├── docker/source-repo/    # 私有源码仓库的 CI 配置（darwin 编译）
 ├── docs/                  # 文档（本目录）
 └── scripts/               # 发布脚本
 ```

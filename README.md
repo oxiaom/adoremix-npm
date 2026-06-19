@@ -13,7 +13,8 @@ AdoreMix 广播服务器的跨平台 npm 安装器、运行器和服务管理器
 | Linux x64 | `@oxiaom/adoremix-linux-x64` | 已支持 |
 | Linux ARM (armv7/armhf) | `@oxiaom/adoremix-linux-arm` | 已支持 |
 | Linux ARM64 (aarch64) | `@oxiaom/adoremix-linux-arm64` | 已支持 |
-| macOS | - | 暂不支持 |
+| macOS x64 (Intel) | `@oxiaom/adoremix-darwin-x64` | CI 编译中（需触发首次构建） |
+| macOS ARM64 (Apple Silicon) | `@oxiaom/adoremix-darwin-arm64` | CI 编译中（需触发首次构建） |
 
 MySQL / Redis / nginx 由用户自备，配置项写入 `config.ini`。
 

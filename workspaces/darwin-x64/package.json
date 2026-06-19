@@ -1,10 +1,10 @@
 {
-  "name": "@oxiaom/adoremix-win32-x64",
+  "name": "@oxiaom/adoremix-darwin-x64",
   "version": "1.0.19",
-  "description": "AdoreMix native binaries and resources for Windows x64",
+  "description": "AdoreMix native binaries and resources for macOS x64 (Intel)",
   "main": "./index.js",
   "_publish_os": [
-    "win32"
+    "darwin"
   ],
   "_publish_cpu": [
     "x64"
