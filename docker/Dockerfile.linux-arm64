@@ -167,7 +167,7 @@ RUN QT_PLUGINS=$(qmake -query QT_INSTALL_PLUGINS) && \
 
 # 第三方库
 RUN for lib in libhiredis libopus libopusfile libmp3lame libssl libcrypto \
-               libsqlite3 libmariadb libstdc++ libgcc_s; do \
+               libsqlite3 libmariadb libstdc++ libgcc_s libdouble-conversion libpcre2-16; do \
         find /usr/lib -name "${lib}*.so*" -exec cp -a {} /out/lib/ \; 2>/dev/null ; \
     done
 
