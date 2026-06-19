@@ -116,18 +116,18 @@ jobs:
           MARIADB_PREFIX=$(brew --prefix mariadb-connector-c)
           OPENSSL_PREFIX=$(brew --prefix openssl@1.1)
 
-          cat >> AdoreMix.pro <<EOF
-
-          macx {
-            INCLUDEPATH += "$OPUS_PREFIX/include" "$HIREDIS_PREFIX/include" "$MARIADB_PREFIX/include" "$OPENSSL_PREFIX/include"
-            LIBS += -L"$OPUS_PREFIX/lib" -lopus -lopusfile -logg
-            LIBS += -L"$HIREDIS_PREFIX/lib" -lhiredis
-            LIBS += -L"$MARIADB_PREFIX/lib" -lmariadb
-            LIBS += -L"$OPENSSL_PREFIX/lib" -lssl -lcrypto
-            # macOS 不需要 DbgHelp（Windows 专属）
-            LIBS -= -lDbgHelp
-          }
-          EOF
+          # 追加 macx {} 块到 .pro（用 printf 避免 YAML heredoc 缩进冲突）
+          {
+            echo ''
+            echo 'macx {'
+            echo "  INCLUDEPATH += \"$OPUS_PREFIX/include\" \"$HIREDIS_PREFIX/include\" \"$MARIADB_PREFIX/include\" \"$OPENSSL_PREFIX/include\""
+            echo "  LIBS += -L\"$OPUS_PREFIX/lib\" -lopus -lopusfile -logg"
+            echo "  LIBS += -L\"$HIREDIS_PREFIX/lib\" -lhiredis"
+            echo "  LIBS += -L\"$MARIADB_PREFIX/lib\" -lmariadb"
+            echo "  LIBS += -L\"$OPENSSL_PREFIX/lib\" -lssl -lcrypto"
+            echo "  LIBS -= -lDbgHelp"
+            echo '}'
+          } >> AdoreMix.pro
 
           echo "===== Patched AdoreMix.pro ====="
           head -50 AdoreMix.pro
@@ -185,23 +185,27 @@ jobs:
           done
 
           # Qt 配置提示（让二进制从同级找 plugins）
-          cat > "$DEPLOY_DIR/qt.conf" <<EOF
-[Paths]
-Plugins=./
-Frameworks=./lib
-EOF
+          printf '%s\n' '[Paths]' 'Plugins=./' 'Frameworks=./lib' > "$DEPLOY_DIR/qt.conf"
 
           # 元信息
-          cat > "$DEPLOY_DIR/.adoremix-native.json" <<EOF
-{
-  "platform": "darwin",
-  "arch": "${{ matrix.arch }}",
-  "binName": "$BIN_NAME",
-  "builtAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "builtBy": "GitHub Actions macos runner (${{ matrix.runner }})",
-  "qtVersion": "$(qmake -query QT_VERSION)"
-}
-EOF
+          cat > "$DEPLOY_DIR/.adoremix-native.json" <<'JSON'
+          {
+            "platform": "darwin",
+            "arch": "__ARCH__",
+            "binName": "__BIN_NAME__",
+            "builtAt": "__BUILT_AT__",
+            "builtBy": "GitHub Actions macos runner (__RUNNER__)",
+            "qtVersion": "__QT_VERSION__"
+          }
+          JSON
+          sed -i.bak \
+            -e "s|__ARCH__|${{ matrix.arch }}|g" \
+            -e "s|__BIN_NAME__|$BIN_NAME|g" \
+            -e "s|__BUILT_AT__|$(date -u +%Y-%m-%dT%H:%M:%SZ)|g" \
+            -e "s|__RUNNER__|${{ matrix.runner }}|g" \
+            -e "s|__QT_VERSION__|$(qmake -query QT_VERSION)|g" \
+            "$DEPLOY_DIR/.adoremix-native.json"
+          rm -f "$DEPLOY_DIR/.adoremix-native.json.bak"
 
           ls -la "$DEPLOY_DIR"
           echo "deploy_dir=$DEPLOY_DIR" >> $GITHUB_OUTPUT
