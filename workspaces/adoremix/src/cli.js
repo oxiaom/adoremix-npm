@@ -117,6 +117,21 @@ function buildProgram() {
       });
     });
 
+  config
+    .command('network')
+    .description('交互式配置 IP（内网选网卡 / 外网手动输入），同时设 LocalIP/Meida_ip/Fip')
+    .option('--workdir <path>')
+    .option('--ip <addr>', '直接指定 IP（非交互）')
+    .option('--no-interactive', '自动选第一个网卡')
+    .action(async (opts) => {
+      const net = require('./config/network');
+      const code = await net.setupNetwork(resolveWorkdir(opts.workdir), {
+        ip: opts.ip,
+        interactive: opts.interactive !== false
+      });
+      process.exitCode = code || 0;
+    });
+
   const runner = require('./runner');
   const nativeRef = () => {
     try { return paths.loadNative(); }
