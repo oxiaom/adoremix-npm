@@ -71,7 +71,7 @@ function buildProgram() {
     .command('test [text]')
     .description('用当前 provider 测试 TTS（生成 _cli_test.mp3）')
     .option('--workdir <path>')
-    .option('-v, --voice <name>', `voice 短名（默认 ${DEFAULT_VOICE || 'xiaoxiao'}）`)
+    .option('-v, --voice <name>', 'voice 短名（默认 xiaoxiao）')
     .option('--volume <n>', '音量 0-100', '50')
     .option('--speed <n>', '语速 0-100', '50')
     .action(async (text, opts) => {
