@@ -104,7 +104,7 @@ jobs:
           # -mcpu=apple-m1 不自动带 crypto，必须 -march=armv8-a+aes 显式开 aes feature
           EXTRA_FLAGS=""
           if [ "${{ matrix.arch }}" = "arm64" ]; then
-            EXTRA_FLAGS='-mcpu=apple-m1'
+            EXTRA_FLAGS='-march=armv8-a+aes'
           fi
 
           qmake "QMAKE_CFLAGS += $EXTRA_FLAGS" "QMAKE_CXXFLAGS += $EXTRA_FLAGS"
