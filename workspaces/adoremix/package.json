@@ -37,7 +37,8 @@
   "files": [
     "bin",
     "src",
-    "templates"
+    "templates",
+    "tts"
   ],
   "keywords": [
     "adoremix",
