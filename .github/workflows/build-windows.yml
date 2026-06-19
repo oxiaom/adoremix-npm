@@ -48,9 +48,15 @@ jobs:
 
       - name: Download source
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p _src/Adore_mix2
-          curl -L -o _src/adoremix.tar.gz "${{ inputs.source_url }}"
+          if echo "${{ inputs.source_url }}" | grep -q "github.com/$GITHUB_REPOSITORY"; then
+            curl -L -H "Authorization: token $GH_TOKEN" -o _src/adoremix.tar.gz "${{ inputs.source_url }}"
+          else
+            curl -L -o _src/adoremix.tar.gz "${{ inputs.source_url }}"
+          fi
           tar -xzf _src/adoremix.tar.gz -C _src/Adore_mix2 --strip-components=0
           test -f _src/Adore_mix2/AdoreMix.pro
 
