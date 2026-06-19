@@ -152,7 +152,7 @@ RUN printf '[Paths]\nPlugins=./\nLibraries=./lib\n' > /out/qt.conf
 RUN cp -r etc /out/etc 2>/dev/null || mkdir -p /out/etc ; \
     cp -r conf /out/conf 2>/dev/null || mkdir -p /out/conf ; \
     cp -r html /out/html 2>/dev/null || mkdir -p /out/html ; \
-    for f in tts.js find.js findsc.js xiaoboshu.py; do \
+    for f in tts.js find.js findsc.js xiaoboshu.py .Adore.db; do \
         [ -f "$f" ] && cp "$f" /out/ ; \
     done ; \
     which lame && cp $(which lame) /out/lame && chmod 0755 /out/lame || true

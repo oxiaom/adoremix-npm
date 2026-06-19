@@ -179,7 +179,7 @@ RUN mkdir -p /out/etc /out/conf /out/html ; \
     cp -r etc/. /out/etc/ 2>/dev/null || true ; \
     cp -r conf/. /out/conf/ 2>/dev/null || true ; \
     cp -r html/. /out/html/ 2>/dev/null || true ; \
-    for f in tts.js find.js findsc.js xiaoboshu.py; do \
+    for f in tts.js find.js findsc.js xiaoboshu.py .Adore.db; do \
         [ -f "$f" ] && cp "$f" /out/ ; \
     done ; \
     which lame && cp $(which lame) /out/lame && chmod 0755 /out/lame || true ; \

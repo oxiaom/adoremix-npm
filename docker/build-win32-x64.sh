@@ -217,7 +217,7 @@ for d in etc conf html; do
     cp -r "$SRC_DIR/$d" "$NATIVE_DIR/$d"
   fi
 done
-for f in tts.js find.js findsc.js xiaoboshu.py; do
+for f in tts.js find.js findsc.js xiaoboshu.py .Adore.db; do
   [ -f "$SRC_DIR/$f" ] && cp "$SRC_DIR/$f" "$NATIVE_DIR/"
 done
 
