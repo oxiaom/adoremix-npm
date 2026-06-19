@@ -36,6 +36,16 @@ function buildProgram() {
     });
 
   program
+    .command('doctor')
+    .description('健康检查：node 版本、二进制、缺库、config.ini、.Adore.db、服务状态')
+    .option('--workdir <path>')
+    .option('--fix', '自动 apt install 缺的库（需要 root / sudo）')
+    .action((opts) => {
+      const doctor = require('./doctor');
+      process.exitCode = doctor.runDoctor(resolveWorkdir(opts.workdir), { fix: !!opts.fix });
+    });
+
+  program
     .command('install')
     .description('初始化工作目录、复制资源、安装协作依赖、生成 config.ini')
     .option('--workdir <path>', '工作目录路径')
