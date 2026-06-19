@@ -41,26 +41,46 @@ function deployWebui(workdir, variant) {
     return false;
   }
   const docroot = path.join(workdir, 'etc', 'docroot');
-  // 备份原 docroot（如果存在且不是我们自己部署的）
-  // 简单做法：直接覆盖（用户业务资源应该在其他地方，docroot 是纯前端 UI）
-  if (fs.existsSync(docroot)) {
-    // 保留 docroot/mp3/ 目录（广播系统运行时存 mp3 的地方）
-    const mp3Backup = path.join(workdir, 'etc', 'docroot_mp3_backup');
-    const mp3Dir = path.join(docroot, 'mp3');
-    if (fs.existsSync(mp3Dir)) {
-      fse.removeSync(mp3Backup);
-      fse.moveSync(mp3Dir, mp3Backup);
+  fse.ensureDirSync(docroot);
+
+  // 只替换 UI 相关文件（index.html + assets/ + js/）
+  // 保留其他用户数据：mp3/（上传的音频）、bangzhu/、luyin2/、static/、xcx/ 等
+  // 这样切换 UI 不会丢失任何业务数据
+  const uiFiles = ['index.html'];
+  const uiDirs = ['assets', 'js'];
+
+  // 先删旧 UI 文件（如果存在）
+  for (const f of uiFiles) {
+    const p = path.join(docroot, f);
+    if (fs.existsSync(p)) fs.unlinkSync(p);
+  }
+  for (const d of uiDirs) {
+    const p = path.join(docroot, d);
+    if (fs.existsSync(p)) fse.removeSync(p);
+  }
+
+  // 复制新 UI 文件
+  for (const f of uiFiles) {
+    const src = path.join(srcDir, f);
+    if (fs.existsSync(src)) fse.copySync(src, path.join(docroot, f));
+  }
+  for (const d of uiDirs) {
+    const src = path.join(srcDir, d);
+    if (fs.existsSync(src)) fse.copySync(src, path.join(docroot, d));
+  }
+
+  // 复制 webui 包里其他顶层文件（如 favicon.ico 等，但不碰用户已有的非 UI 文件）
+  // 注意：只复制 webui 包里"独有"的文件，不覆盖 docroot 已有的同名文件
+  const webuiEntries = fs.readdirSync(srcDir);
+  for (const entry of webuiEntries) {
+    if (uiFiles.includes(entry) || uiDirs.includes(entry)) continue;
+    const dst = path.join(docroot, entry);
+    if (!fs.existsSync(dst)) {
+      // 只在 docroot 不存在时复制（避免覆盖用户数据）
+      fse.copySync(path.join(srcDir, entry), dst);
     }
-    fse.removeSync(docroot);
-  } else {
-    fse.ensureDirSync(path.join(workdir, 'etc'));
   }
-  fse.copySync(srcDir, docroot);
-  // 恢复 mp3/
-  const mp3Backup = path.join(workdir, 'etc', 'docroot_mp3_backup');
-  if (fs.existsSync(mp3Backup)) {
-    fse.moveSync(mp3Backup, path.join(docroot, 'mp3'));
-  }
+
   return true;
 }
 
