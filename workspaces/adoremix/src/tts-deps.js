@@ -84,13 +84,19 @@ function nodeModuleInstalled(workdir, modName) {
 }
 
 function getCredValue(cfg, dottedKey) {
+  // 直接读
   const parts = dottedKey.split('.');
   let cur = cfg;
   for (const p of parts) {
     if (cur == null || typeof cur !== 'object') return undefined;
     cur = cur[p];
   }
-  return cur;
+  if (cur) return cur;
+  // 兼容 Qt 已有字段：TTS.xf_appid → Settings.ttsxfAPPID
+  if (dottedKey === 'TTS.xf_appid' && cfg.Settings && cfg.Settings.ttsxfAPPID) return cfg.Settings.ttsxfAPPID;
+  if (dottedKey === 'TTS.xf_apiSecret' && cfg.Settings && cfg.Settings.ttsxfAPISecret) return cfg.Settings.ttsxfAPISecret;
+  if (dottedKey === 'TTS.xf_apiKey' && cfg.Settings && cfg.Settings.ttsxfAPIKey) return cfg.Settings.ttsxfAPIKey;
+  return undefined;
 }
 
 function detectAptLike() {
