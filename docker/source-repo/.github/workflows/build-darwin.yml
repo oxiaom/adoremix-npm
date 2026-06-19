@@ -100,13 +100,14 @@ jobs:
 
           # ARM64 上 sqlite3mc_amalgamation.c 用 ARM AES 内联函数（vaeseq_u8 等），
           # clang 默认编译不带 aes feature，会报 'vaeseq_u8 requires target feature aes'。
-          # 加 -D SQLITE_OMIT_AES_CTR / CBC 跳过 AES，或加 -march=armv8.4-a+crypto 启用。
+          # SQLITE_OMIT_AES_* 不被 sqlite3mc respect，必须开启 aes target feature。
+          # M1/M2 上原生支持 AES 指令，-mcpu=apple-m1 启用它。
           EXTRA_FLAGS=""
           if [ "${{ matrix.arch }}" = "arm64" ]; then
-            EXTRA_FLAGS='-DSQLITE_OMIT_AES_CTR -DSQLITE_OMIT_AES_CBC'
+            EXTRA_FLAGS='-mcpu=apple-m1'
           fi
 
-          qmake "QMAKE_CFLAGS += $EXTRA_FLAGS"
+          qmake "QMAKE_CFLAGS += $EXTRA_FLAGS" "QMAKE_CXXFLAGS += $EXTRA_FLAGS"
           make -j$(sysctl -n hw.ncpu)
 
           # 找到编译出的 .dylib（必须是真 macOS dylib，不能是 .so）
