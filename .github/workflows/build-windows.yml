@@ -52,11 +52,17 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p _src/Adore_mix2
-          if echo "${{ inputs.source_url }}" | grep -q "github.com/$GITHUB_REPOSITORY"; then
-            curl -L --location-trusted -H "Authorization: token $GH_TOKEN" -o _src/adoremix.tar.gz "${{ inputs.source_url }}"
+          URL="${{ inputs.source_url }}"
+          if echo "$URL" | grep -q "github.com/$GITHUB_REPOSITORY/releases/download/"; then
+            TAG=$(echo "$URL" | sed 's|.*/download/||; s|/.*||')
+            FILE=$(basename "$URL")
+            echo "Using gh CLI: tag=$TAG file=$FILE"
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$FILE" --dir _src/
+            mv "_src/$FILE" _src/adoremix.tar.gz
           else
-            curl -L -o _src/adoremix.tar.gz "${{ inputs.source_url }}"
+            curl -L --location-trusted -H "Authorization: token $GH_TOKEN" -o _src/adoremix.tar.gz "$URL"
           fi
+          ls -lh _src/adoremix.tar.gz
           file _src/adoremix.tar.gz
           tar -xzf _src/adoremix.tar.gz -C _src/Adore_mix2 --strip-components=0
           test -f _src/Adore_mix2/AdoreMix.pro
