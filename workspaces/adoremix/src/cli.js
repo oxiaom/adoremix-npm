@@ -45,6 +45,59 @@ function buildProgram() {
       process.exitCode = doctor.runDoctor(resolveWorkdir(opts.workdir), { fix: !!opts.fix });
     });
 
+  const ttsCmd = program
+    .command('tts')
+    .description('TTS 文字转语音（支持 xf 讯飞 / minimax / edge 三种 provider）');
+
+  ttsCmd
+    .command('list')
+    .description('列出 3 个 provider + 当前激活 + 凭证/依赖状态')
+    .option('--workdir <path>')
+    .action((opts) => {
+      const tts = require('./tts-cli');
+      process.exitCode = tts.cmdList(resolveWorkdir(opts.workdir));
+    });
+
+  ttsCmd
+    .command('config')
+    .description('交互式配置：选 provider + 填凭证')
+    .option('--workdir <path>')
+    .action(async (opts) => {
+      const tts = require('./tts-cli');
+      process.exitCode = await tts.cmdConfig(resolveWorkdir(opts.workdir), {});
+    });
+
+  ttsCmd
+    .command('test [text]')
+    .description('用当前 provider 测试 TTS（生成 _cli_test.mp3）')
+    .option('--workdir <path>')
+    .option('-v, --voice <name>', `voice 短名（默认 ${DEFAULT_VOICE || 'xiaoxiao'}）`)
+    .option('--volume <n>', '音量 0-100', '50')
+    .option('--speed <n>', '语速 0-100', '50')
+    .action(async (text, opts) => {
+      const tts = require('./tts-cli');
+      process.exitCode = await tts.cmdTest(resolveWorkdir(opts.workdir), text, opts);
+    });
+
+  ttsCmd
+    .command('voices')
+    .description('列出所有 voice 短名 + 当前 provider 的映射')
+    .option('--workdir <path>')
+    .action((opts) => {
+      const tts = require('./tts-cli');
+      process.exitCode = tts.cmdVoices(resolveWorkdir(opts.workdir));
+    });
+
+  ttsCmd
+    .command('deps')
+    .description('检查当前 provider 的依赖（python/edge-tts/ffmpeg/npm 包/凭证）')
+    .option('--workdir <path>')
+    .option('--fix', '自动修复缺的依赖（apt install / pip install / npm install）')
+    .action((opts) => {
+      const tts = require('./tts-cli');
+      process.exitCode = tts.cmdDeps(resolveWorkdir(opts.workdir), { fix: !!opts.fix });
+    });
+
   program
     .command('install')
     .description('初始化工作目录、复制资源、安装协作依赖、生成 config.ini')
