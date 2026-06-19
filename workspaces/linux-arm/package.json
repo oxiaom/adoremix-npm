@@ -1,6 +1,6 @@
 {
   "name": "@oxiaom/adoremix-linux-arm",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "AdoreMix native binaries and resources for Linux ARM (armv7 / armhf)",
   "main": "./index.js",
   "_publish_os": [
