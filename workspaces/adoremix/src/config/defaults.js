@@ -94,5 +94,14 @@ module.exports = {
     maxBackups: 2,
     timestampFormat: 'dd.MM.yyyy hh:mm:ss.zzz',
     msgFormat: '{timestamp} {typeNr} {type} {thread} {msg}'
+  },
+  TTS: {
+    provider: 'xf',
+    xf_appid: '',
+    xf_apiSecret: '',
+    xf_apiKey: '',
+    xf_voice_override: '',
+    minimax_token: '',
+    edge_voice_override: ''
   }
 };

@@ -113,6 +113,32 @@ function installHelperDeps(workdir, skipNpmInstall) {
   }
 }
 
+// 部署多 provider TTS dispatcher（xf/minimax/edge）
+// 覆盖原 Dockerfile 拷的旧 tts.js（讯飞专用版），换成统一 dispatcher
+function deployTtsDispatcher(workdir) {
+  const ttsSrcDir = path.join(__dirname, '..', 'tts');
+  if (!fs.existsSync(ttsSrcDir)) {
+    logger.warn('主包无 tts/ 目录（旧版？），跳过 TTS dispatcher 部署');
+    return;
+  }
+  const ttsDstDir = path.join(workdir, 'adoremix-tts');
+  // 复制整个 tts/ 目录（dispatcher + providers + voice-mapping）
+  fse.copySync(ttsSrcDir, ttsDstDir, {
+    filter: (src) => {
+      const base = path.basename(src);
+      // 不复制 tts-wrapper.js（它要复制到顶层当 tts.js）
+      return base !== 'tts-wrapper.js';
+    }
+  });
+  // 顶层 tts.js 用 wrapper 覆盖原版（Qt 调用入口）
+  const wrapperSrc = path.join(ttsSrcDir, 'tts-wrapper.js');
+  const ttsJs = path.join(workdir, 'tts.js');
+  fse.copyFileSync(wrapperSrc, ttsJs);
+  logger.ok('部署 TTS dispatcher（xf/minimax/edge 三选一）');
+  logger.log('    配置：adoremix tts config');
+  logger.log('    测试：adoremix tts test "你好"');
+}
+
 async function runInstall(opts) {
   opts = opts || {};
   const workdir = opts.workdir || paths.defaultWorkdir();
@@ -149,6 +175,7 @@ async function runInstall(opts) {
   } catch (e) {
     return 1;
   }
+  deployTtsDispatcher(workdir);
 
   const config = require('./config');
   const cfgOk = await config.ensureConfig(workdir, { interactive: opts.interactive !== false, force: opts.force });
