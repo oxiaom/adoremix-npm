@@ -53,7 +53,7 @@ jobs:
         run: |
           brew update
           # qt@5 包含 multimedia / network / sql / websockets 模块
-          brew install qt@5 lame opus libogg libopusfile hiredis mariadb-connector-c openssl@1.1
+          brew install qt@5 lame opus libogg opusfile hiredis mariadb-connector-c openssl@1.1
           brew link --force qt@5
           echo "/opt/homebrew/opt/qt@5/bin" >> $GITHUB_PATH
           echo "/usr/local/opt/qt@5/bin" >> $GITHUB_PATH
