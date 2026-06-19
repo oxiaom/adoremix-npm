@@ -86,11 +86,11 @@ if [ "$DRY_RUN" -eq 0 ]; then
   fi
 fi
 
-# ---- 同步 5 个 package.json 版本（dry-run 跳过）----
+# ---- 同步 7 个 package.json 版本（dry-run 跳过）----
 if [ "$DRY_RUN" -eq 1 ]; then
   echo ""
   echo "[dry-run] 预览模式：不修改文件，不 push"
-  echo "  将修改 6 个 package.json 的 version: $CURRENT → $VERSION"
+  echo "  将修改 8 个 package.json 的 version: $CURRENT → $VERSION"
   echo "  将 git commit -m 'release: v$VERSION' + tag v$VERSION + push"
   exit 0
 fi
@@ -107,7 +107,9 @@ node -e "
     'workspaces/win32-x64/package.json',
     'workspaces/linux-x64/package.json',
     'workspaces/linux-arm64/package.json',
-    'workspaces/linux-arm/package.json'
+    'workspaces/linux-arm/package.json',
+    'workspaces/darwin-x64/package.json',
+    'workspaces/darwin-arm64/package.json'
   ];
   for (const rel of targets) {
     const p = path.join(ROOT, rel);
@@ -142,7 +144,7 @@ git push origin "$BRANCH"
 git push origin "v$VERSION"
 
 echo ""
-echo "✅ 完成。GitHub Actions 会自动触发 release.yml，发布 5 个包到 npm。"
+echo "✅ 完成。GitHub Actions 会自动触发 release.yml，发布 7 个包到 npm。"
 echo ""
 echo "查看进度："
 REMOTE=$(git config --get remote.origin.url 2>/dev/null | sed 's|.*github.com[:/]||; s|\.git$||')

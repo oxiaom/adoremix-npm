@@ -12,7 +12,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-const SUBPKGS = ['win32-x64', 'linux-x64', 'linux-arm64', 'linux-arm'];
+const SUBPKGS = ['win32-x64', 'linux-x64', 'linux-arm64', 'linux-arm', 'darwin-x64', 'darwin-arm64'];
 
 function apply(dir, mode) {
   const pkgPath = path.join(ROOT, 'workspaces', dir, 'package.json');

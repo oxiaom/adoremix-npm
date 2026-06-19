@@ -49,9 +49,9 @@ jobs:
       - name: Add os/cpu fields to sub-packages
         run: node scripts/publish-prepare.js add
 
-      - name: Publish 4 platform sub-packages
+      - name: Publish 6 platform sub-packages
         run: |
-          for sub in win32-x64 linux-x64 linux-arm64 linux-arm; do
+          for sub in win32-x64 linux-x64 linux-arm64 linux-arm darwin-x64 darwin-arm64; do
             native_dir="workspaces/$sub/native"
             if [ ! -d "$native_dir" ] || [ "$(find "$native_dir" -type f | wc -l)" -le 1 ]; then
               echo "⚠️  $sub native/ 为空，跳过（可能未构建）"
@@ -86,6 +86,8 @@ jobs:
             - `@oxiaom/adoremix-linux-x64`
             - `@oxiaom/adoremix-linux-arm64`
             - `@oxiaom/adoremix-linux-arm`
+            - `@oxiaom/adoremix-darwin-x64` (macOS Intel)
+            - `@oxiaom/adoremix-darwin-arm64` (macOS Apple Silicon)
 
             ## 安装
 

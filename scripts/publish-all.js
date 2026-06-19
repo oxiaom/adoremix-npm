@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * 5 包同版本发布脚本（子→主顺序，确保主包 install 时子包已就绪）。
+ * 7 包同版本发布脚本（子→主顺序，确保主包 install 时子包已就绪）。
  *
  * 用法：
  *   node scripts/publish-all.js                    # 默认从 package.json 读版本
@@ -19,7 +19,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
-const SUBPKGS = ['win32-x64', 'linux-x64', 'linux-arm64', 'linux-arm'];
+const SUBPKGS = ['win32-x64', 'linux-x64', 'linux-arm64', 'linux-arm', 'darwin-x64', 'darwin-arm64'];
 const MAIN_PKG_DIR = 'adoremix';
 
 function readPkg(rel) {

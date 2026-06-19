@@ -2,7 +2,7 @@ name: build-darwin
 
 # 在 macOS runner 上原生编译 AdoreMix 二进制（x64 + arm64），打包为 tar.gz 上传到 release。
 #
-# 这个 workflow 部署在【私有源码仓库】（oxiaom/adoremix-source），不在公开 npm 仓库里。
+# 这个 workflow 部署在【私有源码仓库】（与 Gitee 主仓库做镜像的 GitHub 私有仓库），不在公开 npm 仓库里。
 # 编译产物由公开仓库的 pull-darwin-artifacts.yml 拉取并发布到 npm。
 #
 # 触发方式：
@@ -49,96 +49,142 @@ jobs:
           uname -m
           echo "Target arch: ${{ matrix.arch }}"
 
-      - name: Install Qt 5 + lame via Homebrew
+      - name: Install Qt 5 + deps via Homebrew
         run: |
           brew update
-          brew install qt@5 lame
+          # qt@5 包含 multimedia / network / sql / websockets 模块
+          brew install qt@5 lame opus libogg libopusfile hiredis mariadb-connector-c openssl@1.1
           brew link --force qt@5
           echo "/opt/homebrew/opt/qt@5/bin" >> $GITHUB_PATH
           echo "/usr/local/opt/qt@5/bin" >> $GITHUB_PATH
           qmake --version
           which lame && file $(which lame)
+          brew --prefix opus
+          brew --prefix hiredis
 
-      - name: Compile QtCipherSqlitePlugin
+      - name: Compile QtCipherSqlitePlugin (nested directory)
         run: |
           QT_PLUGIN_DIR=$(qmake -query QT_INSTALL_PLUGINS)
           echo "Qt plugins dir: $QT_PLUGIN_DIR"
-          if [ -d "QtCipherSqlitePlugin" ]; then
-            cd QtCipherSqlitePlugin
+          # 源码里是双层嵌套：QtCipherSqlitePlugin-develop/QtCipherSqlitePlugin-develop/
+          QT_CIPHER_DIR=$(find . -maxdepth 3 -type d -name "QtCipherSqlitePlugin-develop" | head -1)
+          if [ -z "$QT_CIPHER_DIR" ]; then
+            QT_CIPHER_DIR=$(find . -maxdepth 3 -type d -name "QtCipherSqlitePlugin" | head -1)
+          fi
+          if [ -n "$QT_CIPHER_DIR" ]; then
+            echo "Found QtCipherSqlitePlugin at: $QT_CIPHER_DIR"
+            cd "$QT_CIPHER_DIR"
+            # 如果还是嵌套，再进一层
+            if [ -d "QtCipherSqlitePlugin-develop" ]; then
+              cd QtCipherSqlitePlugin-develop
+            fi
+            # 修正 .qmake.conf / .qmake.stash（如果有）指向当前 Qt
+            rm -f .qmake.stash
             qmake
-            make -j$(sysctl -n hw.ncpu)
-            mkdir -p "$QT_PLUGIN_DIR/sqldrivers"
-            cp -v build/release/libsqlitecipher.* "$QT_PLUGIN_DIR/sqldrivers/" 2>/dev/null || \
-              cp -v *.dylib "$QT_PLUGIN_DIR/sqldrivers/" 2>/dev/null || true
-            cd ..
+            make -j$(sysctl -n hw.ncpu) 2>&1 | tail -30
+            # 找到编译出的 .dylib
+            DYLIB=$(find . -name "libsqlitecipher*.dylib" -type f | head -1)
+            if [ -z "$DYLIB" ]; then
+              DYLIB=$(find . -name "libsqlitecipher*.so" -type f | head -1)
+            fi
+            if [ -n "$DYLIB" ]; then
+              mkdir -p "$QT_PLUGIN_DIR/sqldrivers"
+              cp -v "$DYLIB" "$QT_PLUGIN_DIR/sqldrivers/"
+              echo "✓ QtCipherSqlitePlugin installed"
+            else
+              echo "❌ QtCipherSqlitePlugin 没编译出 dylib"
+              exit 1
+            fi
           else
-            echo "QtCipherSqlitePlugin 目录不存在，跳过"
+            echo "❌ 找不到 QtCipherSqlitePlugin 目录"
+            find . -maxdepth 3 -type d -name "*Cipher*" -o -name "*cipher*"
+            exit 1
           fi
 
       - name: Patch AdoreMix.pro for macOS
         run: |
-          # 1. 移除 Windows/Linux 专属模块（如有）
-          # 2. 修正硬编码的 /opt/qt5.9.1-arm 等路径
-          if [ -f AdoreMix.pro ]; then
-            sed -i.bak 's|/opt/qt5.9.1-arm/[^ ]*||g' AdoreMix.pro || true
-            sed -i.bak 's|/opt/[^ ]*||g' AdoreMix.pro || true
-            # 移除 Windows 专属源文件（如果有）
-            sed -i.bak 's|[^ ]*win\.cpp||g' AdoreMix.pro || true
-            cat AdoreMix.pro | head -50
-          else
-            echo "找不到 AdoreMix.pro"
-            ls
-            exit 1
-          fi
+          # 1. 修正 TARGET 名（原硬编码 linuxarm0）
+          sed -i.bak 's|^TARGET *=.*|TARGET = AdoreMixV8.0.17_console_${{ matrix.bin_suffix }}|' AdoreMix.pro
+
+          # 2. 移除 Windows 专属链接（LIBS += -lDbgHelp 等）
+          # win32{} 块在 macOS 上本来就跳过，不用动
+
+          # 3. 用 brew 的 opus / hiredis / mariadb 替代 Windows 版 LIB
+          # 追加 INCLUDEPATH + LIBS（macOS 专属块）
+          OPUS_PREFIX=$(brew --prefix opus)
+          HIREDIS_PREFIX=$(brew --prefix hiredis)
+          MARIADB_PREFIX=$(brew --prefix mariadb-connector-c)
+          OPENSSL_PREFIX=$(brew --prefix openssl@1.1)
+
+          cat >> AdoreMix.pro <<EOF
+
+          macx {
+            INCLUDEPATH += "$OPUS_PREFIX/include" "$HIREDIS_PREFIX/include" "$MARIADB_PREFIX/include" "$OPENSSL_PREFIX/include"
+            LIBS += -L"$OPUS_PREFIX/lib" -lopus -lopusfile -logg
+            LIBS += -L"$HIREDIS_PREFIX/lib" -lhiredis
+            LIBS += -L"$MARIADB_PREFIX/lib" -lmariadb
+            LIBS += -L"$OPENSSL_PREFIX/lib" -lssl -lcrypto
+            # macOS 不需要 DbgHelp（Windows 专属）
+            LIBS -= -lDbgHelp
+          }
+          EOF
+
+          echo "===== Patched AdoreMix.pro ====="
+          head -50 AdoreMix.pro
+          echo "..."
+          tail -20 AdoreMix.pro
 
       - name: qmake + make
         run: |
           qmake AdoreMix.pro -spec macx-clang CONFIG+=release
-          make -j$(sysctl -n hw.ncpu) 2>&1 | tail -80
+          make -j$(sysctl -n hw.ncpu) 2>&1 | tee build.log | tail -100
 
       - name: Locate built binary
         id: bin
         run: |
-          # 找到编译产物（可能在项目根、bin/ 或 build/）
-          BIN=$(find . -maxdepth 3 -type f -name "AdoreMix*" ! -name "*.o" ! -name "*.cpp" 2>/dev/null | head -1)
+          BIN_NAME="AdoreMixV8.0.17_console_${{ matrix.bin_suffix }}"
+          BIN=$(find . -maxdepth 3 -type f -name "$BIN_NAME" ! -name "*.o" 2>/dev/null | head -1)
           if [ -z "$BIN" ]; then
-            echo "找不到编译产物"
-            find . -name "AdoreMix*" 2>/dev/null
+            echo "❌ 找不到编译产物 $BIN_NAME"
+            find . -name "AdoreMix*" -type f 2>/dev/null | head -10
+            echo "===== build.log 最后 50 行 ====="
+            tail -50 build.log
             exit 1
           fi
           echo "Binary: $BIN"
           file "$BIN"
-          # 重命名为标准名
-          TARGET="AdoreMixV8.0.17_console_${{ matrix.bin_suffix }}"
-          mv "$BIN" "$TARGET"
-          echo "binary=$TARGET" >> $GITHUB_OUTPUT
+          echo "binary=$BIN" >> $GITHUB_OUTPUT
+          echo "bin_name=$BIN_NAME" >> $GITHUB_OUTPUT
 
       - name: macdeployqt (bundle Qt frameworks)
         run: |
           BIN="${{ steps.bin.outputs.binary }}"
-          # 用 macdeployqt 把 Qt frameworks + plugins 复制到二进制同级目录
-          # 这样运行时不依赖 brew 装的系统 Qt
+          BIN_NAME="${{ steps.bin.outputs.bin_name }}"
           DEPLOY_DIR=$(pwd)/_deploy
           mkdir -p "$DEPLOY_DIR"
-          cp -v "$BIN" "$DEPLOY_DIR/"
+
+          # 主二进制
+          cp -v "$BIN" "$DEPLOY_DIR/$BIN_NAME"
+
+          # lame
           cp -v "$(which lame)" "$DEPLOY_DIR/" 2>/dev/null || \
             cp -v /opt/homebrew/bin/lame "$DEPLOY_DIR/" 2>/dev/null || \
             cp -v /usr/local/bin/lame "$DEPLOY_DIR/" || true
 
+          # macdeployqt：把 Qt frameworks + plugins 复制到二进制同级并修正 @rpath
           cd "$DEPLOY_DIR"
-          # macdeployqt 需要 .app 包，但 CLI 工具可以用 -executable 指定
-          macdeployqt "$DEPLOY_DIR/$BIN" -executable="$DEPLOY_DIR/$BIN" -verbose=2 || true
+          macdeployqt "$DEPLOY_DIR/$BIN_NAME" -executable="$DEPLOY_DIR/$BIN_NAME" -verbose=2 || true
 
-          # 复制业务资源（etc/、conf/、html/、tts.js、find.js、findsc.js）
+          # 复制业务资源
           cd ..
           for RESOURCE in etc conf html; do
-            [ -d "$RESOURCE" ] && cp -R "$RESOURCE" "$DEPLOY_DIR/"
+            [ -d "$RESOURCE" ] && cp -R "$RESOURCE" "$DEPLOY_DIR/" || true
           done
           for SCRIPT in tts.js find.js findsc.js xiaoboshu.py; do
-            [ -f "$SCRIPT" ] && cp -v "$SCRIPT" "$DEPLOY_DIR/"
+            [ -f "$SCRIPT" ] && cp -v "$SCRIPT" "$DEPLOY_DIR/" || true
           done
 
-          # Qt 配置提示
+          # Qt 配置提示（让二进制从同级找 plugins）
           cat > "$DEPLOY_DIR/qt.conf" <<EOF
 [Paths]
 Plugins=./
@@ -150,7 +196,7 @@ EOF
 {
   "platform": "darwin",
   "arch": "${{ matrix.arch }}",
-  "binName": "${{ steps.bin.outputs.binary }}",
+  "binName": "$BIN_NAME",
   "builtAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "builtBy": "GitHub Actions macos runner (${{ matrix.runner }})",
   "qtVersion": "$(qmake -query QT_VERSION)"
@@ -160,24 +206,24 @@ EOF
           ls -la "$DEPLOY_DIR"
           echo "deploy_dir=$DEPLOY_DIR" >> $GITHUB_OUTPUT
 
+      - name: Verify binary architecture
+        run: |
+          cd "${{ steps.bin.outputs.deploy_dir }}"
+          file "${{ steps.bin.outputs.bin_name }}" | tee /dev/stderr
+          echo "--- Linked libraries ---"
+          otool -L "${{ steps.bin.outputs.bin_name }}" 2>&1 | head -30
+
       - name: Pack tar.gz
         id: pack
         run: |
           VERSION="${{ inputs.version || github.ref_name }}"
-          # 去掉 tag 前缀的 v
           VERSION="${VERSION#v}"
           TGZ="adoremix-${{ matrix.platform }}-${VERSION}.tar.gz"
           tar -czf "$TGZ" -C "${{ steps.bin.outputs.deploy_dir }}" .
-          ls -lh "$TGG" 2>/dev/null || ls -lh "$TGZ"
+          ls -lh "$TGZ"
           shasum -a 256 "$TGZ"
           echo "tgz=$TGZ" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Verify binary architecture
-        run: |
-          cd "${{ steps.bin.outputs.deploy_dir }}"
-          file "${{ steps.bin.outputs.binary }}" | tee /dev/stderr
-          otool -L "${{ steps.bin.outputs.binary }}" 2>&1 | head -20
 
       - name: Create release and upload asset
         uses: softprops/action-gh-release@v2
