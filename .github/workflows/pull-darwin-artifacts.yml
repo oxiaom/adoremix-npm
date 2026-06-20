@@ -86,31 +86,6 @@ jobs:
 
       - name: Commit artifacts
         if: env.skip != 'true'
-
-      - name: Extract to workspaces/${{ matrix.platform }}/native/
-        if: env.skip != 'true'
-        run: |
-          VERSION="${{ inputs.version }}"
-          TGZ="adoremix-${{ matrix.platform }}-${VERSION}.tar.gz"
-          mkdir -p workspaces/${{ matrix.platform }}/native
-          # 保留 README.md（占位），其他全清掉
-          find workspaces/${{ matrix.platform }}/native -mindepth 1 ! -name README.md -delete 2>/dev/null || true
-          tar -xzf "_dl/$TGZ" -C workspaces/${{ matrix.platform }}/native/
-          ls -la workspaces/${{ matrix.platform }}/native | head -20
-
-      - name: Verify binary
-        if: env.skip != 'true'
-        run: |
-          BIN=$(find workspaces/${{ matrix.platform }}/native -maxdepth 1 -type f -name "AdoreMix*" 2>/dev/null | head -1)
-          if [ -z "$BIN" ]; then
-            echo "❌ 没找到 AdoreMix 二进制"
-            ls workspaces/${{ matrix.platform }}/native
-            exit 1
-          fi
-          file "$BIN"
-
-      - name: Commit artifacts
-        if: env.skip != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
