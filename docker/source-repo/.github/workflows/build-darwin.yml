@@ -148,7 +148,7 @@ jobs:
             echo ''
             echo 'macx {'
             echo "  INCLUDEPATH += \"$OPUS_PREFIX/include\" \"$HIREDIS_PREFIX/include\" \"$MARIADB_PREFIX/include\" \"$OPENSSL_PREFIX/include\""
-            echo "  LIBS += -L\"$OPUS_PREFIX/lib\" -lopus -lopusfile -logg"
+            echo "  LIBS += -L\"$OPUS_PREFIX/lib\" -L\"$(brew --prefix opusfile)/lib\" -L\"$(brew --prefix libogg)/lib\" -lopus -lopusfile -logg"
             echo "  LIBS += -L\"$HIREDIS_PREFIX/lib\" -lhiredis"
             echo "  LIBS += -L\"$MARIADB_PREFIX/lib\" -lmariadb"
             echo "  LIBS += -L\"$OPENSSL_PREFIX/lib\" -lssl -lcrypto"
