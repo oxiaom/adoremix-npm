@@ -138,6 +138,11 @@ jobs:
           MARIADB_PREFIX=$(brew --prefix mariadb-connector-c)
           OPENSSL_PREFIX=$(brew --prefix openssl@1.1)
 
+          # QtCipher 安装到 $QT_PLUGIN_DIR/sqldrivers/，不是 Qt 的 lib/，
+          # 链接时要显式 -L 指向插件目录才能找到 libsqlitecipher.dylib
+          QT_PLUGIN_DIR=$(qmake -query QT_INSTALL_PLUGINS)
+          QT_LIB_DIR=$(qmake -query QT_INSTALL_LIBS)
+
           # 追加 macx {} 块到 .pro（用 printf 避免 YAML heredoc 缩进冲突）
           {
             echo ''
@@ -147,6 +152,7 @@ jobs:
             echo "  LIBS += -L\"$HIREDIS_PREFIX/lib\" -lhiredis"
             echo "  LIBS += -L\"$MARIADB_PREFIX/lib\" -lmariadb"
             echo "  LIBS += -L\"$OPENSSL_PREFIX/lib\" -lssl -lcrypto"
+            echo "  LIBS += -L\"$QT_PLUGIN_DIR/sqldrivers\" -L\"$QT_LIB_DIR\""
             echo "  LIBS -= -lDbgHelp"
             echo '}'
           } >> AdoreMix.pro
