@@ -1,0 +1,8 @@
+{
+  "platform": "darwin",
+  "arch": "arm64",
+  "binName": "AdoreMixV8.0.17_console_darwinarm64",
+  "builtAt": "2026-06-20T01:58:37Z",
+  "builtBy": "GitHub Actions macos runner (macos-14)",
+  "qtVersion": "5.15.19"
+}
