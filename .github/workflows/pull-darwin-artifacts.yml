@@ -48,6 +48,13 @@ jobs:
           SOURCE_REPO="${{ inputs.source_repo }}"
           TGZ="adoremix-${{ matrix.platform }}-${VERSION}.tar.gz"
           echo "拉取 $SOURCE_REPO@v$VERSION / $TGZ"
+          # 如果 release 里没这个 asset（比如 x64 还没编译完），跳过整个 job
+          if ! gh release view "v${VERSION}" --repo "$SOURCE_REPO" --json assets \
+                --jq ".assets[].name" | grep -qx "$TGZ"; then
+            echo "⚠️  release v${VERSION} 没有 $TGZ，跳过（可能尚未编译）"
+            echo "skip=true" >> $GITHUB_ENV
+            exit 0
+          fi
           gh release download "v${VERSION}" \
             --repo "$SOURCE_REPO" \
             --pattern "$TGZ" \
@@ -56,6 +63,7 @@ jobs:
           shasum -a 256 _dl/"$TGZ"
 
       - name: Extract to workspaces/${{ matrix.platform }}/native/
+        if: env.skip != 'true'
         run: |
           VERSION="${{ inputs.version }}"
           TGZ="adoremix-${{ matrix.platform }}-${VERSION}.tar.gz"
@@ -66,6 +74,7 @@ jobs:
           ls -la workspaces/${{ matrix.platform }}/native | head -20
 
       - name: Verify binary
+        if: env.skip != 'true'
         run: |
           BIN=$(find workspaces/${{ matrix.platform }}/native -maxdepth 1 -type f -name "AdoreMix*" 2>/dev/null | head -1)
           if [ -z "$BIN" ]; then
@@ -76,6 +85,32 @@ jobs:
           file "$BIN"
 
       - name: Commit artifacts
+        if: env.skip != 'true'
+
+      - name: Extract to workspaces/${{ matrix.platform }}/native/
+        if: env.skip != 'true'
+        run: |
+          VERSION="${{ inputs.version }}"
+          TGZ="adoremix-${{ matrix.platform }}-${VERSION}.tar.gz"
+          mkdir -p workspaces/${{ matrix.platform }}/native
+          # 保留 README.md（占位），其他全清掉
+          find workspaces/${{ matrix.platform }}/native -mindepth 1 ! -name README.md -delete 2>/dev/null || true
+          tar -xzf "_dl/$TGZ" -C workspaces/${{ matrix.platform }}/native/
+          ls -la workspaces/${{ matrix.platform }}/native | head -20
+
+      - name: Verify binary
+        if: env.skip != 'true'
+        run: |
+          BIN=$(find workspaces/${{ matrix.platform }}/native -maxdepth 1 -type f -name "AdoreMix*" 2>/dev/null | head -1)
+          if [ -z "$BIN" ]; then
+            echo "❌ 没找到 AdoreMix 二进制"
+            ls workspaces/${{ matrix.platform }}/native
+            exit 1
+          fi
+          file "$BIN"
+
+      - name: Commit artifacts
+        if: env.skip != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -99,6 +134,7 @@ jobs:
           fi
 
       - name: Upload artifact (for verification)
+        if: env.skip != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.platform }}-native
