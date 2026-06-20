@@ -221,24 +221,18 @@ jobs:
           # Qt 配置提示（让二进制从同级找 plugins）
           printf '%s\n' '[Paths]' 'Plugins=./' 'Frameworks=./lib' > "$DEPLOY_DIR/qt.conf"
 
-          # 元信息
-          cat > "$DEPLOY_DIR/.adoremix-native.json" <<'JSON'
-          {
-            "platform": "darwin",
-            "arch": "__ARCH__",
-            "binName": "__BIN_NAME__",
-            "builtAt": "__BUILT_AT__",
-            "builtBy": "GitHub Actions macos runner (__RUNNER__)",
-            "qtVersion": "__QT_VERSION__"
-          }
-          JSON
-          sed -i.bak \
-            -e "s|__ARCH__|${{ matrix.arch }}|g" \
-            -e "s|__BIN_NAME__|$BIN_NAME|g" \
-            -e "s|__BUILT_AT__|$(date -u +%Y-%m-%dT%H:%M:%SZ)|g" \
-            -e "s|__RUNNER__|${{ matrix.runner }}|g" \
-            -e "s|__QT_VERSION__|$(qmake -query QT_VERSION)|g" \
-            "$DEPLOY_DIR/.adoremix-native.json"
+          # 元信息（用 printf 避开 heredoc 缩进问题）
+          BUILT_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          QT_VER=$(qmake -query QT_VERSION)
+          printf '%s\n' \
+            '{' \
+            "  \"platform\": \"darwin\"," \
+            "  \"arch\": \"${{ matrix.arch }}\"," \
+            "  \"binName\": \"$BIN_NAME\"," \
+            "  \"builtAt\": \"$BUILT_AT\"," \
+            "  \"builtBy\": \"GitHub Actions macos runner (${{ matrix.runner }})\"," \
+            "  \"qtVersion\": \"$QT_VER\"" \
+            '}' > "$DEPLOY_DIR/.adoremix-native.json"
           rm -f "$DEPLOY_DIR/.adoremix-native.json.bak"
 
           ls -la "$DEPLOY_DIR"
