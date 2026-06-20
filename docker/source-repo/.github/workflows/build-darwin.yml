@@ -274,5 +274,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.platform }}-deploy
-          path: ${{ steps.bin.outputs.deploy_dir }}
+          path: ${{ steps.deploy.outputs.deploy_dir }}
           retention-days: 7
