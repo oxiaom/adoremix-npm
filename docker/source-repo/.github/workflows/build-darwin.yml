@@ -98,6 +98,16 @@ jobs:
           # 清理可能的旧安装（让 qmake 重装正确的 macOS 版本）
           rm -f "$QT_PLUGIN_DIR/sqldrivers/libsqlitecipher."* 2>/dev/null || true
 
+          # ARM64 上 sqlite3mc 的 AES 函数用 __attribute__((target("neon,crypto")))
+          # 但新版 clang 弃用了 crypto feature，必须改成 target("aes")。
+          if [ "${{ matrix.arch }}" = "arm64" ]; then
+            find . -name "sqlite3mc_amalgamation.c" -exec sed -i.bak 's|target("neon,crypto")|target("aes")|g' {} \;
+            # 定义 USE_CLANG_ATTR_TARGET_AARCH64 让 FUNC_ISA 宏生效
+            AES_FLAG='-DUSE_CLANG_ATTR_TARGET_AARCH64'
+          else
+            AES_FLAG=''
+          fi
+
           # ARM64 上 sqlite3mc_amalgamation.c 用 ARM AES 内联函数（vaeseq_u8 等），
           # clang 默认编译不带 aes feature，会报 'vaeseq_u8 requires target feature aes'。
           # SQLITE_OMIT_AES_* 不被 sqlite3mc respect，必须开启 aes target feature。
