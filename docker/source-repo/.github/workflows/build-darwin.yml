@@ -191,6 +191,7 @@ jobs:
           echo "bin_name=$BIN_NAME" >> $GITHUB_OUTPUT
 
       - name: macdeployqt (bundle Qt frameworks)
+        id: deploy
         run: |
           BIN="${{ steps.bin.outputs.binary }}"
           BIN_NAME="${{ steps.bin.outputs.bin_name }}"
@@ -240,7 +241,7 @@ jobs:
 
       - name: Verify binary architecture
         run: |
-          cd "${{ steps.bin.outputs.deploy_dir }}"
+          cd "${{ steps.deploy.outputs.deploy_dir }}"
           file "${{ steps.bin.outputs.bin_name }}" | tee /dev/stderr
           echo "--- Linked libraries ---"
           otool -L "${{ steps.bin.outputs.bin_name }}" 2>&1 | head -30
@@ -251,7 +252,7 @@ jobs:
           VERSION="${{ inputs.version || github.ref_name }}"
           VERSION="${VERSION#v}"
           TGZ="adoremix-${{ matrix.platform }}-${VERSION}.tar.gz"
-          tar -czf "$TGZ" -C "${{ steps.bin.outputs.deploy_dir }}" .
+          tar -czf "$TGZ" -C "${{ steps.deploy.outputs.deploy_dir }}" .
           ls -lh "$TGZ"
           shasum -a 256 "$TGZ"
           echo "tgz=$TGZ" >> $GITHUB_OUTPUT
