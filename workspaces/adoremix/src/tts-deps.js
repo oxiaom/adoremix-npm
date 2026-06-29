@@ -76,6 +76,27 @@ function pythonHasModule(pyCmd, modName) {
   } catch (e) { return false; }
 }
 
+// python3 自带 pip 吗（Debian/Armbian 精简系统默认不带，要 apt install python3-pip）
+function pythonHasPip(pyCmd) {
+  if (!pyCmd) return false;
+  try {
+    execFileSync(pyCmd, ['-m', 'pip', '--version'], { stdio: 'pipe' });
+    return true;
+  } catch (e) { return false; }
+}
+
+// 是否 PEP 668 externally-managed（Debian 12 / Ubuntu 23.04+ 默认禁止往系统 Python 装 pip 包）
+// 这种环境 pip install 会报 externally-managed-environment，需加 --break-system-packages
+function isExternallyManaged(pyCmd) {
+  if (!pyCmd) return false;
+  try {
+    const out = execFileSync(pyCmd, ['-c',
+      'import sysconfig,os;print(os.path.exists(os.path.join(sysconfig.get_path("stdlib"),"EXTERNALLY-MANAGED")))'
+    ], { stdio: 'pipe', encoding: 'utf8' });
+    return String(out).trim() === 'True';
+  } catch (e) { return false; }
+}
+
 function nodeModuleInstalled(workdir, modName) {
   try {
     require.resolve(modName, { paths: [workdir] });
@@ -220,7 +241,27 @@ function fixDeps(workdir, issues, opts) {
         });
       } else if (issue.fixType === 'pip') {
         const py = issue.fixArgs.pyCmd || findPythonCmd() || 'python3';
-        execSync(`${sudo}${py} -m pip install ${issue.fixArgs.pkg}`, { stdio: 'inherit' });
+        // 1. 确保 pip 可用（Debian/Armbian 精简系统 python3 自带但 pip 缺失）
+        if (!pythonHasPip(py)) {
+          const pkgMgr = detectAptLike();
+          console.log(`  pip 未安装，先补 python3-pip ...`);
+          if (pkgMgr) {
+            execSync(`${sudo}${pkgMgr} install -y python3-pip`, { stdio: 'inherit' });
+          } else {
+            // 退路：用 Python 自带的 ensurepip 引导
+            execSync(`${sudo}${py} -m ensurepip --upgrade`, { stdio: 'inherit' });
+          }
+        }
+        // 2. PEP 668：Debian 12 / Ubuntu 23.04+ 禁止往系统 Python 装包，需 --break-system-packages
+        const breakFlag = isExternallyManaged(py) ? ' --break-system-packages' : '';
+        if (breakFlag) console.log('  检测到 externally-managed-environment，加 --break-system-packages');
+        // 3. PyPI 镜像：默认用清华（国内默认 PyPI 慢，常因下载损坏导致 hash 校验失败）。
+        //    国外用户可设环境变量 ADOREMIX_PIP_INDEX 覆盖，留空则用官方源。
+        const indexUrl = process.env.ADOREMIX_PIP_INDEX !== undefined
+          ? process.env.ADOREMIX_PIP_INDEX
+          : 'https://pypi.tuna.tsinghua.edu.cn/simple';
+        const indexFlag = indexUrl ? ` -i ${indexUrl}` : '';
+        execSync(`${sudo}${py} -m pip install${breakFlag}${indexFlag} ${issue.fixArgs.pkg}`, { stdio: 'inherit' });
       } else if (issue.fixType === 'system') {
         if (!issue.fixArgs.pkgMgr) throw new Error('包管理器未识别');
         execSync(`${sudo}${issue.fixArgs.pkgMgr} install -y ${issue.fixArgs.aptPkg}`, { stdio: 'inherit' });
