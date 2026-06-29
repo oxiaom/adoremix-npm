@@ -18,6 +18,10 @@ const { execSync, execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
+// 二进制调外部命令 lame 把 TTS 生成的音频转码成 mp3（源码 cmd = "lame -S"），
+// 所有 provider 都需要，缺失时 node tts.js 生成 .txt 但 lame 转码 mp3 失败。
+const TRANSCODE_TOOLS = [{ name: 'lame', cmd: 'lame' }];
+
 const PROVIDER_DEPENDENCIES = {
   xf: {
     nodeModules: ['crypto-js', 'ws', 'log4node'],
@@ -28,14 +32,14 @@ const PROVIDER_DEPENDENCIES = {
     ],
     systemPkgs: [],
     pipPkgs: [],
-    executables: []
+    executables: TRANSCODE_TOOLS
   },
   minimax: {
     nodeModules: [],  // 用 Node 内置 https
     creds: [{ key: 'TTS.minimax_token', name: 'token' }],
     systemPkgs: [],
     pipPkgs: [],
-    executables: []
+    executables: TRANSCODE_TOOLS
   },
   edge: {
     nodeModules: [],
@@ -45,7 +49,7 @@ const PROVIDER_DEPENDENCIES = {
       { name: 'ffmpeg', cmd: 'ffmpeg' }
     ],
     pipPkgs: [{ pkg: 'edge-tts', import: 'edge_tts' }],
-    executables: [{ name: 'ffmpeg', cmd: 'ffmpeg' }]
+    executables: [{ name: 'ffmpeg', cmd: 'ffmpeg' }, ...TRANSCODE_TOOLS]
   }
 };
 
@@ -187,12 +191,13 @@ function checkDeps(workdir, providerName, cfg) {
   }
 
   // 4. 系统可执行
-  for (const exe of deps.execubles || deps.systemPkgs) {
+  for (const exe of deps.executables || deps.systemPkgs) {
     if (exe.cmd && !which(exe.cmd)) {
       // 推断 apt 包名
       let aptPkg = '';
       if (exe.name === 'python3') aptPkg = 'python3 python3-pip';
       else if (exe.name === 'ffmpeg') aptPkg = 'ffmpeg';
+      else if (exe.name === 'lame') aptPkg = 'lame';
       const pkgMgr = detectAptLike();
       issues.push({
         severity: 'error',
