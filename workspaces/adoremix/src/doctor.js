@@ -26,6 +26,56 @@ const LIB_TO_PKG = {
   'libkrb5.so.3': 'libkrb5-3'
 };
 
+// ICU 70 兜底：
+// AdoreMix 二进制在 Ubuntu 22.04（ICU 70）编译，链接 libicui18n.so.70 / libicuuc.so.70 / libicudata.so.70。
+// Debian 12 / 树莓派 OS / Armbian 等 apt 源里只有 libicu72，没有 libicu70，跨发行版运行会缺库。
+// 这三个 .so 都由同一个包 libicu70 提供，从 Ubuntu 官方源下载对应架构 .deb 装上即可（与系统 libicu72 共存，不冲突）。
+const ICU70_LIBS = ['libicui18n.so.70', 'libicuuc.so.70', 'libicudata.so.70'];
+const ICU70_DEB_SOURCES = {
+  // node arch → [deb arch, Ubuntu 源根]
+  arm64: ['arm64', 'http://ports.ubuntu.com/ubuntu-ports'],   // 非 amd64 架构走 ports
+  x64: ['amd64', 'http://archive.ubuntu.com/ubuntu']
+};
+
+function getIcu70DebInfo() {
+  const src = ICU70_DEB_SOURCES[process.arch];
+  if (!src) return null;
+  const [debArch, base] = src;
+  return {
+    debArch,
+    url: `${base}/pool/main/i/icu/libicu70_70.1-2_${debArch}.deb`,
+    tmpPath: '/tmp/adoremix-libicu70.deb'
+  };
+}
+
+function tryFixIcu70() {
+  const info = getIcu70DebInfo();
+  if (!info) {
+    logger.warn(`  ICU 70 兜底暂不支持架构 ${process.arch}，请手动安装 libicu70`);
+    return false;
+  }
+  logger.info(`==> ICU 70 兜底：从 Ubuntu 官方源下载 libicu70 (${info.debArch})`);
+  logger.log(`    ${info.url}`);
+  try {
+    execSync(`wget -q -O ${info.tmpPath} '${info.url}'`, { stdio: 'inherit' });
+    const size = fs.statSync(info.tmpPath).size;
+    if (size < 100000) {
+      logger.error(`下载失败（文件 ${size} 字节，可能 URL 失效或网络不通）`);
+      try { fs.unlinkSync(info.tmpPath); } catch (e) {}
+      return false;
+    }
+    logger.info(`==> dpkg -i libicu70_70.1-2_${info.debArch}.deb (${(size / 1024 / 1024).toFixed(1)} MB)`);
+    execSync(`dpkg -i ${info.tmpPath}`, { stdio: 'inherit' });
+    try { fs.unlinkSync(info.tmpPath); } catch (e) {}
+    return true;
+  } catch (e) {
+    logger.error(`ICU 70 安装失败：${(e.message || '').split('\n')[0]}`);
+    logger.warn(`  可能需要 root，手动执行：`);
+    logger.warn(`  wget -O /tmp/libicu70.deb '${info.url}' && sudo dpkg -i /tmp/libicu70.deb`);
+    return false;
+  }
+}
+
 function runDoctor(workdir, opts) {
   opts = opts || {};
   logger.log('=== AdoreMix 健康检查 ===');
@@ -93,37 +143,68 @@ function runDoctor(workdir, opts) {
         logger.ok(`✓ 动态库依赖完整`);
       } else {
         logger.error(`❌ 缺动态库：${missing.join(', ')}`);
+        // 分类：apt 可装 / ICU 70 跨发行版兜底 / 完全未知
         const pkgs = [];
+        const icu70 = [];
         const unknown = [];
         for (const lib of missing) {
-          const pkg = LIB_TO_PKG[lib];
-          if (pkg) pkgs.push(pkg);
+          if (ICU70_LIBS.includes(lib)) icu70.push(lib);
+          else if (LIB_TO_PKG[lib]) pkgs.push(LIB_TO_PKG[lib]);
           else unknown.push(lib);
         }
         const allPkgs = [...new Set(pkgs)];
+
+        // 1) apt 可装的库
+        let aptSolved = allPkgs.length === 0;
         if (allPkgs.length > 0) {
           const cmd = `apt-get install -y ${allPkgs.join(' ')}`;
           logger.log(`  建议命令（root 用户）：${cmd}`);
-          if (unknown.length > 0) {
-            logger.warn(`  未知库（无 apt 映射）：${unknown.join(', ')}`);
-          }
-          issues.push({
-            type: 'libs',
-            severity: 'error',
-            msg: missing.join(', '),
-            fixCmd: cmd,
-            pkgs: allPkgs
-          });
           if (opts.fix) {
             logger.info(`==> 自动修复：执行 ${cmd}`);
             try {
               execSync(cmd, { stdio: 'inherit', cwd: workdir });
               logger.ok('✓ 缺库已安装');
+              aptSolved = true;
             } catch (e) {
               logger.error(`修复失败：${e.message}`);
               logger.warn('可能需要 sudo：手动执行 sudo ' + cmd);
             }
           }
+        }
+
+        // 2) ICU 70 跨发行版兜底（Debian 12 / 树莓派 OS / Armbian 等无 libicu70）
+        let icuSolved = icu70.length === 0;
+        if (icu70.length > 0) {
+          const icuMsg = `ICU 70 缺失（${icu70.join(', ')}）— 二进制在 Ubuntu 22.04 编译，Debian 12 等需补 libicu70`;
+          if (opts.fix) {
+            if (tryFixIcu70()) {
+              logger.ok('✓ libicu70 已安装（ICU 70 兜底）');
+              icuSolved = true;
+            } else {
+              issues.push({ type: 'icu70', severity: 'error', msg: icuMsg });
+            }
+          } else {
+            logger.warn(`  ${icuMsg}`);
+            logger.log(`    自动修复：adoremix doctor --fix（从 Ubuntu 官方源下载 libicu70 .deb）`);
+            issues.push({ type: 'icu70', severity: 'error', msg: icuMsg });
+          }
+        }
+
+        // 3) 未解决的记 issue
+        if (!aptSolved) {
+          issues.push({
+            type: 'libs',
+            severity: 'error',
+            msg: missing.join(', '),
+            fixCmd: `apt-get install -y ${allPkgs.join(' ')}`,
+            pkgs: allPkgs
+          });
+        }
+
+        // 4) 完全未知的库
+        if (unknown.length > 0) {
+          logger.warn(`  未知库（无 apt 映射，需手动排查）：${unknown.join(', ')}`);
+          issues.push({ type: 'libs-unknown', severity: 'error', msg: unknown.join(', ') });
         }
       }
     } catch (e) {
