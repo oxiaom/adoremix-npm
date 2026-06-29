@@ -34,6 +34,7 @@ const ICU70_LIBS = ['libicui18n.so.70', 'libicuuc.so.70', 'libicudata.so.70'];
 const ICU70_DEB_SOURCES = {
   // node arch → [deb arch, Ubuntu 源根]
   arm64: ['arm64', 'http://ports.ubuntu.com/ubuntu-ports'],   // 非 amd64 架构走 ports
+  arm: ['armhf', 'http://ports.ubuntu.com/ubuntu-ports'],     // armv7 / armhf（树莓派 32 位、老款盒子）
   x64: ['amd64', 'http://archive.ubuntu.com/ubuntu']
 };
 
