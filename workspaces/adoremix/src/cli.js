@@ -308,14 +308,37 @@ function buildProgram() {
     .option('--file <path>', '指定日志文件')
     .option('-n, --lines <n>', '初始打印行数', parseInt, 50)
     .action((opts) => {
-      const wp = paths.workdirPaths(resolveWorkdir(opts.workdir));
-      const file = opts.file || wp.logfile;
+      const workdir = resolveWorkdir(opts.workdir);
+      const wp = paths.workdirPaths(workdir);
       const fs = require('fs');
       const { spawn } = require('child_process');
-      if (!fs.existsSync(file)) {
-        logger.warn(`日志文件不存在 ${file}`);
+      // 默认日志文件：选最近更新的。
+      //   systemd 模式 → logs/svc.log（unit 模板 StandardOutput=append 写这里）
+      //   前台/daemon 模式 → var/app.log（spawn 重定向）
+      // 用户可用 --file 覆盖。
+      let file = opts.file;
+      if (!file) {
+        const candidates = [
+          path.join(workdir, 'logs', 'svc.err'),   // systemd 模式：二进制实时输出（stderr，更新最频繁）
+          path.join(workdir, 'logs', 'svc.log'),   // systemd 模式：node logger（stdout）
+          wp.logfile                                 // 前台/daemon 模式：var/app.log
+        ];
+        let bestMtime = 0;
+        for (const f of candidates) {
+          try {
+            const m = fs.statSync(f).mtimeMs;
+            if (m > bestMtime) { bestMtime = m; file = f; }
+          } catch (e) {}
+        }
+      }
+      if (!file || !fs.existsSync(file)) {
+        logger.warn(`日志文件不存在（找了 logs/svc.err、logs/svc.log、${wp.logfile}）`);
+        logger.log('提示：systemd 模式也可用 journalctl -u adoremix -f');
         process.exitCode = 1;
         return;
+      }
+      if (file !== wp.logfile && !opts.file) {
+        logger.log(`（自动选中 ${path.relative(workdir, file)}，--file 可指定其他）`);
       }
       if (!opts.follow) {
         const tail = spawn(process.platform === 'win32' ? 'more' : 'tail', process.platform === 'win32' ? [file] : ['-n', String(opts.lines), file], { stdio: 'inherit' });
