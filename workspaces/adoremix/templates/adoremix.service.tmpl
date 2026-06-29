@@ -1,6 +1,6 @@
 [Unit]
 Description=AdoreMix Broadcast Server
-Documentation=https://github.com/your-org/adoremix
+Documentation=https://github.com/oxiaom/adoremix-npm
 After=network.target mysqld.service redis.service
 
 [Service]
@@ -8,7 +8,11 @@ Type=simple
 User=__USER__
 Group=__GROUP__
 WorkingDirectory=__WORKDIR__
-ExecStart=__NODE__ __CLI__ start --daemon --workdir __WORKDIR__
+# 用前台模式（不加 --daemon）：node 持续运行作为 systemd 主进程，
+# systemd 才能正确跟踪/重启/停止服务。
+# daemon 模式 node 会 unref 后退出，systemd 默认 KillMode=control-group
+# 会把整个 cgroup（含刚 spawn 的二进制）一起杀掉，服务起不来。
+ExecStart=__NODE__ __CLI__ start --workdir __WORKDIR__
 Restart=on-failure
 RestartSec=5
 StandardOutput=append:__WORKDIR__/logs/svc.log
