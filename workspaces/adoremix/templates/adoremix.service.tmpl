@@ -16,7 +16,7 @@ ExecStart=__NODE__ __CLI__ start --workdir __WORKDIR__
 Restart=on-failure
 RestartSec=5
 StandardOutput=append:__WORKDIR__/logs/svc.log
-StandardError=append:__WORKDIR__/logs/svc.err
+StandardError=append:__WORKDIR__/logs/svc.log
 LimitNOFILE=65536
 
 [Install]
