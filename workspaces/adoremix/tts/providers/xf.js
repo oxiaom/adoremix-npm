@@ -20,7 +20,9 @@ const VOICES = {
   xiaohan: 'xiaohan', xiaomeng: 'xiaomeng', xiaomo: 'xiaomo',
   xiaoqiu: 'xiaoqiu', xiaorui: 'xiaorui', xiaoshuang: 'xiaoshuang',
   xiaoxuan: 'xiaoxuan', xiaoyan: 'xiaoyan', xiaoyou: 'xiaoyou',
-  yunfeng: 'yunfeng', yunhao: 'yunhao', yunxiang: 'yunxiang', yunyang: 'yunyang'
+  yunfeng: 'yunfeng', yunhao: 'yunhao', yunxiang: 'yunxiang', yunyang: 'yunyang',
+  // 讯飞原生发音人（WebUI 实际传，讯飞 API 直接认，自身透传）
+  aisjiuxu: 'aisjiuxu', aisxping: 'aisxping', aisjinger: 'aisjinger'
 };
 
 function synthesize({ text, voice, volume, speed, outFile }, creds) {
@@ -32,7 +34,8 @@ function synthesize({ text, voice, volume, speed, outFile }, creds) {
       return reject(new Error('讯飞 TTS 缺凭证：xf_appid / xf_apiSecret / xf_apiKey'));
     }
 
-    const vcn = VOICES[voice] || creds.xf_voice_override || 'xiaoxiao';
+    // 标准短名走 VOICES 映射；讯飞原生 vcn(如 aisjiuxu 许久)直接透传（讯飞接受任意 vcn）
+    const vcn = VOICES[voice] || voice || creds.xf_voice_override || 'xiaoxiao';
     const host = 'tts-api.xfyun.cn';
     const hostUrl = `wss://${host}/v2/tts`;
 
