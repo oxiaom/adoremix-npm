@@ -256,12 +256,34 @@ function buildProgram() {
     daemon: opts.daemon === true
   });
 
+  // systemd 管理本服务时，start/stop/restart 委托 systemctl（避免手动 spawn/kill 脱离
+  // systemd 管理——尤其 restart 的 stop+手动start 会让服务脱离 systemd）。
+  // status 不委托（pidfile 检查已与 systemctl 一致）。仅 Linux + 服务 active 时生效。
+  function systemdDelegate(cmd) {
+    if (process.platform !== 'linux') return false;
+    const { execSync } = require('child_process');
+    let active;
+    try {
+      active = execSync('systemctl is-active adoremix 2>/dev/null', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+    } catch (e) { return false; }
+    if (active !== 'active') return false;
+    logger.info(`检测到 systemd 管理，执行 systemctl ${cmd} adoremix`);
+    try {
+      execSync(`systemctl ${cmd} adoremix`, { stdio: 'inherit' });
+      return true;
+    } catch (e) {
+      logger.error(`systemctl ${cmd} 失败：${(e.message || '').split('\n')[0]}（可能需要 sudo，或用 systemctl --user）`);
+      return false;
+    }
+  }
+
   program
     .command('start')
     .description('启动 AdoreMix（默认前台，加 --daemon 后台）')
     .option('--workdir <path>')
     .option('--daemon', '后台运行（nohup 风格）')
     .action((opts) => {
+      if (systemdDelegate('start')) return;
       try {
         if (opts.daemon) runner.startDaemon(runnerOpts(opts));
         else runner.startForeground(runnerOpts(opts));
@@ -277,6 +299,7 @@ function buildProgram() {
     .option('--workdir <path>')
     .option('--timeout <ms>', 'SIGTERM 超时后 SIGKILL 的毫秒数', parseInt)
     .action(async (opts) => {
+      if (systemdDelegate('stop')) return;
       process.exitCode = await runner.stop(runnerOpts(opts));
     });
 
@@ -294,6 +317,7 @@ function buildProgram() {
     .option('--workdir <path>')
     .option('--daemon', '后台模式重启')
     .action(async (opts) => {
+      if (systemdDelegate('restart')) return;
       const r = await runner.restart(runnerOpts(opts));
       if (r && r.alreadyRunning === false && r.pid) {
         // ok
