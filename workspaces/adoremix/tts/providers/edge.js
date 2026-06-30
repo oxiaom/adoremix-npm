@@ -43,10 +43,10 @@ const VOICES = {
   yunfeng:    'zh-CN-YunxiNeural',
   yunhao:     'zh-CN-YunxiNeural',
   yunxiang:   'zh-CN-YunjianNeural',
-  // 讯飞原生发音人（Qt/WebUI 可能直接传讯飞名 aisxxx）→ 就近映射到 edge 有效 voice
-  aisjiuxu:   'zh-CN-YunxiNeural',   // 许久（男）→ 云希
-  aisbabyxu:  'zh-CN-YunxiaNeural',  // 男童 → 云夏
-  aisxuxin:   'zh-CN-YunxiNeural'    // 晓旭（男）→ 云希
+  // 讯飞原生发音人（WebUI 音色选项：小燕/许久/小萍/小婧）→ 映射到 edge 有效 voice
+  aisjiuxu:   'zh-CN-YunxiNeural',    // 许久（男）→ 云希
+  aisxping:   'zh-CN-XiaoxiaoNeural', // 小萍（女）→ 晓晓
+  aisjinger:  'zh-CN-XiaoyiNeural'    // 小婧（女）→ 晓伊
 };
 
 function findPython() {
