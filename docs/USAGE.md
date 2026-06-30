@@ -401,6 +401,14 @@ adoremix doctor --fix     # 检查 + 自动修复
 - ✅ 服务运行状态
 - ✅ TTS provider 依赖（凭证 / npm 包 / python / ffmpeg）
 
+`doctor --fix` 自动修复能力（缺什么自动装什么）：
+- 🔧 系统库：`apt install` libdouble-conversion3 / libpcre2-16-0 等
+- 🔧 **ICU 70 跨发行版兜底**：Debian 12 / 树莓派 OS / Armbian 缺 libicu70（Ubuntu 22.04 编译的库版本不匹配）时，自动从 Ubuntu 官方源下载对应架构 .deb 安装（arm64 / armhf / x64 全覆盖）
+- 🔧 **lame**：二进制转码 mp3 必需的外部命令，自动 `apt install lame`
+- 🔧 **edge TTS 三连坑**：python3-pip 缺失自动装；Debian 12 PEP 668 自动加 `--break-system-packages`；pip 默认走清华镜像避免下载损坏
+- 🔧 dispatcher 协作依赖（ini 等 node 包）：自动 `npm install`（默认走 npmmirror 镜像）
+- 🔧 TTS provider 的 npm 包（crypto-js/ws/log4node）：自动装
+
 输出示例：
 ```
 === AdoreMix 健康检查 ===
