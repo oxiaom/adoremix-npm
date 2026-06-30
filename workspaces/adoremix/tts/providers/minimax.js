@@ -35,6 +35,10 @@ const VOICES = {
   yunhao:     'male-qn-badao',
   yunxiang:   'male-qn-jingying',
   yunyang:    'male-qn-qingse',
+  // 讯飞原生发音人（Qt/WebUI 实际传）→ 就近映射到 minimax voice_id
+  aisjiuxu:   'male-qn-jingying',    // 许久（男）
+  aisxping:   'female-tianmei',      // 小萍（女）
+  aisjinger:  'female-shaonv',       // 小婧（女）
   // minimax 自有音色（直接透传）
   'male-qn-qingse': 'male-qn-qingse',
   'male-qn-daxuesheng': 'male-qn-daxuesheng',
