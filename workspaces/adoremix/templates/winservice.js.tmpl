@@ -17,7 +17,9 @@ const svc = new Service({
   description: SVC_DESC,
   script: CLI,
   execPath: NODE,
-  args: ['start', '--daemon', '--workdir', WORKDIR],
+  // 用前台模式（不加 --daemon）：node 持续运行作为服务主进程，winsw 才能正确跟踪/重启/停止。
+  // daemon 模式 node 会 unref 后退出，winsw 认为服务停了（跟 systemd 同 bug）。
+  args: ['start', '--workdir', WORKDIR],
   cwd: WORKDIR,
   env: [{
     name: 'NODE_ENV',
