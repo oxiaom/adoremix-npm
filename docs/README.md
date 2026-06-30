@@ -86,8 +86,8 @@ adoremix service install
 | Linux | x64 | `@oxiaom/adoremix-linux-x64` |
 | Linux | ARM64 | `@oxiaom/adoremix-linux-arm64` |
 | Linux | ARM (armhf) | `@oxiaom/adoremix-linux-arm` |
-| macOS | x64 (Intel) | `@oxiaom/adoremix-darwin-x64` |
-| macOS | ARM64 (Apple Silicon) | `@oxiaom/adoremix-darwin-arm64` |
+| macOS | x64 (Intel) | `@oxiaom/adoremix-darwin-x64`（待编译，可用 Rosetta 跑 arm64 包） |
+| macOS | ARM64 (Apple Silicon) | `@oxiaom/adoremix-darwin-arm64`（已支持） |
 
 npm 会自动按当前平台拉对应子包，**不用手动选**。
 
