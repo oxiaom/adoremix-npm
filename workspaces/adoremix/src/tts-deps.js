@@ -159,8 +159,13 @@ function checkDeps(workdir, providerName, cfg) {
     }
   }
 
-  // 2. Node 模块
-  for (const mod of deps.nodeModules) {
+  // 2. Node 模块（provider 自己的 + dispatcher 公共依赖）
+  // dispatcher tts.js 所有 provider 都走，它 require ini 读 config，
+  // 缺失时二进制调 node tts.js 直接 MODULE_NOT_FOUND（TTS 全挂）。
+  // 常见于 --skip-npm-install 安装或 npm install 失败的场景。
+  const DISPATCHER_NODE_DEPS = ['ini'];
+  const allNodeMods = [...new Set([...deps.nodeModules, ...DISPATCHER_NODE_DEPS])];
+  for (const mod of allNodeMods) {
     if (!nodeModuleInstalled(workdir, mod)) {
       issues.push({
         severity: 'error',
@@ -240,7 +245,12 @@ function fixDeps(workdir, issues, opts) {
     if (!issue.autoFixable) continue;
     try {
       if (issue.fixType === 'npm') {
-        execSync(`npm install ${issue.fixArgs.mod} --no-audit --no-fund`, {
+        // 国内默认 npm 源慢/易失败，走 npmmirror（ADOREMIX_NPM_REGISTRY 可覆盖，留空用官方源）
+        const registry = process.env.ADOREMIX_NPM_REGISTRY !== undefined
+          ? process.env.ADOREMIX_NPM_REGISTRY
+          : 'https://registry.npmmirror.com';
+        const regFlag = registry ? ` --registry ${registry}` : '';
+        execSync(`npm install ${issue.fixArgs.mod}${regFlag} --no-audit --no-fund`, {
           cwd: issue.fixArgs.cwd,
           stdio: 'inherit'
         });
