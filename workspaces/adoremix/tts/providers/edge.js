@@ -42,7 +42,11 @@ const VOICES = {
   xiaoyou:    'zh-CN-XiaoyiNeural',
   yunfeng:    'zh-CN-YunxiNeural',
   yunhao:     'zh-CN-YunxiNeural',
-  yunxiang:   'zh-CN-YunjianNeural'
+  yunxiang:   'zh-CN-YunjianNeural',
+  // 讯飞原生发音人（Qt/WebUI 可能直接传讯飞名 aisxxx）→ 就近映射到 edge 有效 voice
+  aisjiuxu:   'zh-CN-YunxiNeural',   // 许久（男）→ 云希
+  aisbabyxu:  'zh-CN-YunxiaNeural',  // 男童 → 云夏
+  aisxuxin:   'zh-CN-YunxiNeural'    // 晓旭（男）→ 云希
 };
 
 function findPython() {
