@@ -1,6 +1,6 @@
 {
   "name": "@oxiaom/adoremix-darwin-arm64",
-  "version": "1.0.19",
+  "version": "1.0.20",
   "description": "AdoreMix native binaries and resources for macOS ARM64 (Apple Silicon)",
   "main": "./index.js",
   "_publish_os": [
