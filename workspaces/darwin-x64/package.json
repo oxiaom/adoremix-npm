@@ -1,6 +1,6 @@
 {
   "name": "@oxiaom/adoremix-darwin-x64",
-  "version": "1.0.20",
+  "version": "1.0.21",
   "description": "AdoreMix native binaries and resources for macOS x64 (Intel)",
   "main": "./index.js",
   "_publish_os": [
