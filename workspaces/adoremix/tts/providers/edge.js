@@ -15,26 +15,34 @@ const path = require('path');
 const os = require('os');
 
 // 短名 → edge-tts voice 全名
+// 注意：edge-tts 的 zh-CN voice 实际只有 8 个（--list-voices 确认）：
+//   女声 XiaoxiaoNeural(晓晓) XiaoyiNeural(晓伊)
+//   男声 YunxiNeural(云希) YunjianNeural(云健) YunxiaNeural(云夏) YunyangNeural(云扬)
+//   方言 liaoning-XiaobeiNeural shaanxi-XiaoniNeural
+// 讯飞/Qt 传的很多短名在 edge 无对应，就近映射到同性别有效 voice；
+// synthesize 另有 fallback 兜底（voice 调用失败回落 XiaoxiaoNeural）。
 const VOICES = {
+  // 直接对应
   xiaoxiao:   'zh-CN-XiaoxiaoNeural',
+  xiaoyi:     'zh-CN-XiaoyiNeural',
   yunxi:      'zh-CN-YunxiNeural',
   yunjian:    'zh-CN-YunjianNeural',
-  xiaoyi:     'zh-CN-XiaoyiNeural',
   yunxia:     'zh-CN-YunxiaNeural',
-  xiaochen:   'zh-CN-XiaochenNeural',
-  xiaohan:    'zh-CN-XiaohanNeural',
-  xiaomeng:   'zh-CN-XiaomengNeural',
-  xiaomo:     'zh-CN-XiaomoNeural',
-  xiaoqiu:    'zh-CN-XiaoqiuNeural',
-  xiaorui:    'zh-CN-XiaoruiNeural',
-  xiaoshuang: 'zh-CN-XiaoshuangNeural',
-  xiaoxuan:   'zh-CN-XiaoxuanNeural',
-  xiaoyan:    'zh-CN-XiaoyanNeural',
-  xiaoyou:    'zh-CN-XiaoyouNeural',
-  yunfeng:    'zh-CN-YunfengNeural',
-  yunhao:     'zh-CN-YunhaoNeural',
-  yunxiang:   'zh-CN-YunxiangNeural',
-  yunyang:    'zh-CN-YunyangNeural'
+  yunyang:    'zh-CN-YunyangNeural',
+  // edge 无对应，就近映射（女声→晓晓/晓伊，男声→云希/云健）
+  xiaoyan:    'zh-CN-XiaoxiaoNeural',
+  xiaochen:   'zh-CN-XiaoxiaoNeural',
+  xiaohan:    'zh-CN-XiaoxiaoNeural',
+  xiaomeng:   'zh-CN-XiaoyiNeural',
+  xiaomo:     'zh-CN-XiaoyiNeural',
+  xiaoqiu:    'zh-CN-XiaoxiaoNeural',
+  xiaorui:    'zh-CN-XiaoxiaoNeural',
+  xiaoshuang: 'zh-CN-XiaoyiNeural',
+  xiaoxuan:   'zh-CN-XiaoxiaoNeural',
+  xiaoyou:    'zh-CN-XiaoyiNeural',
+  yunfeng:    'zh-CN-YunxiNeural',
+  yunhao:     'zh-CN-YunxiNeural',
+  yunxiang:   'zh-CN-YunjianNeural'
 };
 
 function findPython() {
@@ -77,7 +85,8 @@ function synthesize({ text, voice, volume, speed, outFile }, creds) {
     }
 
     const py = findPython();
-    const voiceId = VOICES[voice] || creds.edge_voice_override || 'zh-CN-XiaoxiaoNeural';
+    const DEFAULT_VOICE = 'zh-CN-XiaoxiaoNeural';
+    const wantedVoice = VOICES[voice] || creds.edge_voice_override || DEFAULT_VOICE;
 
     // edge-tts rate/volume 是百分比字符串，如 "+50%" / "-20%"
     const sp = parseInt(speed) || 50;
@@ -91,8 +100,8 @@ function synthesize({ text, voice, volume, speed, outFile }, creds) {
     const txtFile = path.join(tmpDir, `adoremix-edge-${Date.now()}.txt`);
     fs.writeFileSync(txtFile, text);
 
-    try {
-      // 用 python -m edge_tts 调用（避免命令找不到）
+    // 跑一次 edge-tts（指定 voice），voice 无效/网络抖动时回落默认 voice 重试
+    function runEdge(voiceId) {
       execFileSync(py, [
         '-m', 'edge_tts',
         '--voice', voiceId,
@@ -101,9 +110,23 @@ function synthesize({ text, voice, volume, speed, outFile }, creds) {
         '-f', txtFile,
         '--write-media', webmFile
       ], { stdio: 'pipe' });
+      if (!fs.existsSync(webmFile) || fs.statSync(webmFile).size === 0) {
+        throw new Error('edge-tts 未生成音频（voice 可能无效或网络问题）');
+      }
+    }
 
-      if (!fs.existsSync(webmFile)) {
-        throw new Error('edge-tts 未生成音频');
+    let usedVoice = wantedVoice;
+    try {
+      try {
+        runEdge(wantedVoice);
+      } catch (e) {
+        // voice 在 edge-tts 不存在（微软列表动态变化）或网络抖动 → 回落默认 voice 重试一次
+        if (wantedVoice !== DEFAULT_VOICE) {
+          usedVoice = DEFAULT_VOICE;
+          runEdge(DEFAULT_VOICE);
+        } else {
+          throw e;
+        }
       }
 
       // 2. ffmpeg 转 mp3
@@ -118,7 +141,7 @@ function synthesize({ text, voice, volume, speed, outFile }, creds) {
       // 3. 清理临时
       try { fs.unlinkSync(webmFile); fs.unlinkSync(txtFile); } catch (e) {}
 
-      resolve({ outFile, provider: 'edge', voice: voiceId });
+      resolve({ outFile, provider: 'edge', voice: usedVoice });
     } catch (e) {
       try { fs.unlinkSync(webmFile); fs.unlinkSync(txtFile); } catch (_) {}
       reject(new Error('edge-tts 失败: ' + e.message));
