@@ -189,7 +189,11 @@ mkdir -p "$NATIVE_DIR"
 # 拷 exe + Qt DLL + plugins（windeployqt 自动处理）
 cp "$EXE_PATH" "$NATIVE_DIR/"
 echo "==> windeployqt 收集依赖..."
-"$WINDEPLOYQT" --release --no-translations --no-system-d3d-compiler \
+# 必须用纯净 PATH：本机 PATH 里有 G:\Qt\Qt5.9.0\5.9\mingw53_32\bin 等旧 32 位 Qt，
+# 否则 windeployqt 会在 PATH 里找到旧的 32 位 Qt5*.dll 并部署进 native，
+# 造成「64 位 exe + 32 位 Qt DLL」混装、运行即崩（2026-08 实测）。
+PATH="$MINGW_BIN:/c/Windows/System32:/c/Windows:/c/Windows/System32/Wbem" \
+  "$WINDEPLOYQT" --release --no-translations --no-system-d3d-compiler \
   --compiler-runtime --no-opengl-sw "$NATIVE_DIR/$TARGET_BIN" 2>&1 | tail -20
 
 # Qt5 Multimedia 等额外 plugins
