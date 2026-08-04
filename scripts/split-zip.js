@@ -64,6 +64,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (a === '--dry-run') args.dryRun = true;
     else if (a === '--only') args.only = argv[++i];
+    else if (a === '--win32-force') args.forceWin32 = true;
     else if (a === '--win32') args.sources['win32-x64'] = argv[++i];
     else if (a === '--linux-x64') args.sources['linux-x64'] = argv[++i];
     else if (a === '--linux-arm') args.sources['linux-arm'] = argv[++i];
@@ -213,6 +214,14 @@ function main() {
     const src = args.sources[p];
     if (!src) {
       console.log(`\n[${p}] 无源（跳过）`);
+      continue;
+    }
+    // win32 回归保护：默认源 AdoreMIXMICV8 是旧的 32 位 Qt 5.9 部署目录，
+    // 用它 split 会把已修复的 64 位 Qt 5.15.2 native 覆盖回坏状态（64 位 exe + 32 位 DLL）。
+    if (p === 'win32-x64' && src === DEFAULTS['win32-x64'] && !args.forceWin32) {
+      console.error(`\n[win32-x64] 跳过：默认源 ${src} 是旧的 32 位 Qt 5.9 目录，会覆盖已修复的 64 位 native。`);
+      console.error(`  Windows native 现在由 docker/build-win32-x64.sh 构建，不要再用它 split。`);
+      console.error(`  确要覆盖请显式传 --win32 <新源目录> 或 --win32-force。`);
       continue;
     }
     processPlatform(p, src, args.dryRun);

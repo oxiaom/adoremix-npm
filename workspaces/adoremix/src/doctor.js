@@ -339,6 +339,20 @@ function runDoctor(workdir, opts) {
     logger.warn(`⚠  config.ini 不存在`);
   }
 
+  // 5.5 工作目录是否由旧版本安装（native 有更新时需 install --force 刷新，否则继续用旧二进制）
+  const markerPath = path.join(workdir, '.adoremix-installed');
+  try {
+    const marker = JSON.parse(fs.readFileSync(markerPath, 'utf8'));
+    const pkgVer = require('../package.json').version;
+    if (marker.version && marker.version !== pkgVer) {
+      issues.push({ type: 'workdir-stale', severity: 'warn', msg: `工作目录由 v${marker.version} 安装，当前包 v${pkgVer}。若 native 有更新需 adoremix install --force 刷新二进制/资源（保留 config.ini）。` });
+      logger.warn(`⚠  工作目录由 v${marker.version} 安装，当前包 v${pkgVer}，二进制/资源可能陈旧`);
+      logger.log(`    刷新：adoremix install --force`);
+    } else if (marker.version) {
+      logger.ok(`✓ 工作目录版本 v${marker.version} 与当前包一致`);
+    }
+  } catch (e) { /* .adoremix-installed 不存在或不可解析则跳过 */ }
+
   // 6. .Adore.db 存在 + 有数据
   const dbPath = path.join(workdir, '.Adore.db');
   if (fs.existsSync(dbPath)) {

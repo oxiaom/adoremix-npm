@@ -159,6 +159,13 @@ function deployWebuiIfPresent(workdir) {
 async function runInstall(opts) {
   opts = opts || {};
   const workdir = opts.workdir || paths.defaultWorkdir();
+  // 前置拦截：安装目录不能含中文等非 ASCII 字符（AdoreMix 在含中文路径下运行会出问题）
+  if (/[^\x00-\x7F]/.test(workdir)) {
+    logger.error(`❌ 工作目录含非 ASCII 字符（中文等）：${workdir}`);
+    logger.log(`    AdoreMix 在含中文的路径下运行会出问题，请用纯英文路径重装，如：`);
+    logger.log(`    adoremix install --workdir C:/adoremix`);
+    return 1;
+  }
   let native;
   try {
     native = opts.native || paths.loadNative();
