@@ -2,6 +2,12 @@
 
 本文件记录 @oxiaom/adoremix 各版本变更。版本号同步主包 + 4-6 个平台子包。
 
+## 1.0.25 — 2026-08-04
+
+### 安装（升级安全）
+- **`adoremix install --force` 不再覆盖已存在的 config.ini**：`--force` 只刷新二进制/资源，保留客户自定义配置（端口、设备等）。需要重建配置请用 `adoremix config init --force`。
+- 注：1.0.24 文档曾声明此行为但代码未生效（`ensureConfig` 仍传 `force: true`），本版真正修复，与文档对齐。
+
 ## 1.0.24 — 2026-08-04
 
 ### doctor（解决 Linux 运行中崩溃定位）
@@ -11,9 +17,6 @@
   - **Qt 捆绑一致性**：确认加载的是捆绑 `lib/` 里的 Qt 5.15.3，而非系统 Qt（版本不匹配会崩）。
 - 新增"已解析依赖 N 项，缺库 M 项"统计，方便把输出贴回排障。
 - 缺库/ICU70 的 `--fix` 逻辑保留不变。
-
-### 安装（升级安全）
-- **`adoremix install --force` 不再覆盖已存在的 config.ini**：`--force` 只刷新二进制/资源，保留客户自定义配置（端口、设备等）。需要重建配置请用 `adoremix config init --force`。
 
 ## 1.0.23 — 2026-08-02
 
@@ -26,7 +29,7 @@
 只更新 npm 包**不会**生效——`adoremix start` 优先用工作目录里 `install` 时复制的二进制，需刷新工作目录：
 ```bash
 npm install -g @oxiaom/adoremix@latest
-adoremix install --force     # 刷新工作目录新二进制/资源（v1.0.24 起保留 config.ini）
+adoremix install --force     # 刷新工作目录新二进制/资源（v1.0.25 起保留 config.ini）
 adoremix restart
 ```
 
