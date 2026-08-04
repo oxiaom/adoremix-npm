@@ -77,6 +77,65 @@ function tryFixIcu70() {
   }
 }
 
+// ---- 版本兼容性检查辅助 ----
+
+// "3.4.29" -> [3,4,29]（数值比较用，避免 "2.34" < "2.3.4" 之类的字符串排序陷阱）
+function parseVer(str) {
+  if (typeof str !== 'string') return null;
+  const m = str.match(/^(\d+)(?:\.(\d+))?(?:\.(\d+))?/);
+  if (!m) return null;
+  return [Number(m[1]), Number(m[2] || 0), Number(m[3] || 0)];
+}
+
+// a>b→1, a<b→-1, 相等→0
+function compareVer(a, b) {
+  const va = parseVer(a), vb = parseVer(b);
+  if (!va || !vb) return 0;
+  for (let i = 0; i < 3; i++) {
+    if (va[i] > vb[i]) return 1;
+    if (va[i] < vb[i]) return -1;
+  }
+  return 0;
+}
+
+// 读文件找出引用的最高符号版本，如 maxSymVer(bin, 'GLIBCXX') -> '3.4.29'。
+// 纯 node 实现（latin1 读 + 正则扫 .dynstr），不依赖 strings/grep/sort 等外部工具。
+function maxSymVer(file, prefix) {
+  try {
+    const s = fs.readFileSync(file).toString('latin1');
+    const re = new RegExp(prefix + '_\\d+(?:\\.\\d+){1,2}', 'g');
+    const found = [];
+    let m;
+    while ((m = re.exec(s)) !== null) found.push(m[0].slice(prefix.length + 1));
+    if (!found.length) return null;
+    found.sort(compareVer);
+    return found[found.length - 1];
+  } catch (e) {
+    return null;
+  }
+}
+
+// 一组文件（二进制 + 捆绑 Qt 库）中引用的最高符号版本 = 整包对该符号版本的最低需求
+function requiredSymVers(files, prefix) {
+  let max = null;
+  for (const f of files) {
+    if (!f || !fs.existsSync(f)) continue;
+    const v = maxSymVer(f, prefix);
+    if (v && (!max || compareVer(v, max) > 0)) max = v;
+  }
+  return max;
+}
+
+// 解析 ldd 输出：lib名 -> 绝对路径（not found 记为 null）
+function parseLdd(lddOut) {
+  const resolved = {};
+  for (const line of lddOut.split('\n')) {
+    const m = line.match(/^\s*(\S+)\s+=>\s+(\S+)/);
+    if (m) resolved[m[1]] = m[2] === 'not found' ? null : m[2];
+  }
+  return resolved;
+}
+
 function runDoctor(workdir, opts) {
   opts = opts || {};
   logger.log('=== AdoreMix 健康检查 ===');
@@ -135,11 +194,8 @@ function runDoctor(workdir, opts) {
     const checkBin = fs.existsSync(binPath) ? binPath : nativeBinPath;
     try {
       const ldd = execSync(`ldd "${checkBin}"`, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
-      const missing = [];
-      for (const line of ldd.split('\n')) {
-        const m = line.match(/^\s*(\S+)\s*=>\s*not found/);
-        if (m) missing.push(m[1]);
-      }
+      const resolved = parseLdd(ldd);
+      const missing = Object.keys(resolved).filter(k => resolved[k] === null);
       if (missing.length === 0) {
         logger.ok(`✓ 动态库依赖完整`);
       } else {
@@ -208,6 +264,60 @@ function runDoctor(workdir, opts) {
           issues.push({ type: 'libs-unknown', severity: 'error', msg: unknown.join(', ') });
         }
       }
+      // ---- 版本兼容性检查（所有依赖库的版本与匹配）----
+      const libDir = path.join(path.dirname(checkBin), 'lib');
+      const qtLibs = [];
+      try {
+        for (const f of fs.readdirSync(libDir)) {
+          if (/^libQt5.*\.so\.\d/.test(f)) qtLibs.push(path.join(libDir, f));
+        }
+      } catch (e) { /* lib 目录不存在则跳过捆绑 Qt 扫描 */ }
+      const scanFiles = [checkBin].concat(qtLibs);
+
+      // A. libstdc++ GLIBCXX 版本（捆绑 Qt 5.15 需 GCC 9 时代符号，实测 GLIBCXX_3.4.29）
+      const reqCxx = requiredSymVers(scanFiles, 'GLIBCXX');
+      const stdcppPath = resolved['libstdc++.so.6'];
+      if (reqCxx && stdcppPath) {
+        const provCxx = maxSymVer(stdcppPath, 'GLIBCXX');
+        if (provCxx && compareVer(provCxx, reqCxx) < 0) {
+          issues.push({ type: 'libstdcxx-version', severity: 'error', msg: `系统 libstdc++ 太旧：需 GLIBCXX_${reqCxx}，实际只有 GLIBCXX_${provCxx}。运行会 undefined symbol 崩溃，需 Ubuntu 20.04+（libstdc++6 升级），无法自动降级。` });
+          logger.error(`❌ libstdc++ 版本不兼容：需 GLIBCXX_${reqCxx}，实际 GLIBCXX_${provCxx}`);
+        } else if (provCxx) {
+          logger.ok(`✓ libstdc++ GLIBCXX_${provCxx}（需 >= ${reqCxx}）`);
+        }
+      }
+
+      // B. glibc GLIBC 版本（二进制在 Ubuntu 22.04 编译，实测需 GLIBC_2.34）
+      const reqGlibc = requiredSymVers(scanFiles, 'GLIBC');
+      const libcPath = resolved['libc.so.6'];
+      if (reqGlibc && libcPath) {
+        const provGlibc = maxSymVer(libcPath, 'GLIBC');
+        if (provGlibc && compareVer(provGlibc, reqGlibc) < 0) {
+          issues.push({ type: 'glibc-version', severity: 'error', msg: `系统 glibc 太旧：需 GLIBC_${reqGlibc}，实际 GLIBC_${provGlibc}。二进制在 Ubuntu 22.04 编译，需 Ubuntu 22.04+。` });
+          logger.error(`❌ glibc 版本不兼容：需 GLIBC_${reqGlibc}，实际 GLIBC_${provGlibc}`);
+        } else if (provGlibc) {
+          logger.ok(`✓ glibc GLIBC_${provGlibc}（需 >= ${reqGlibc}）`);
+        }
+      }
+
+      // C. Qt 捆绑一致性：必须加载捆绑 lib/ 里的 Qt，不能加载系统 Qt（版本可能不匹配）
+      const qtSonames = Object.keys(resolved).filter(k => /^libQt5.*\.so\.5$/.test(k));
+      const libDirNorm = path.normalize(libDir);
+      for (const so of qtSonames) {
+        const rp = resolved[so];
+        if (!rp) {
+          issues.push({ type: 'qt-missing', severity: 'error', msg: `${so} 未能解析，捆绑 Qt 加载失败` });
+          logger.error(`❌ ${so} 未解析（捆绑 Qt 加载失败）`);
+        } else if (!path.normalize(rp).startsWith(libDirNorm + path.sep)) {
+          issues.push({ type: 'qt-bundle', severity: 'error', msg: `${so} 加载系统 Qt：${rp}（应为捆绑 ${libDir}），版本可能不匹配` });
+          logger.error(`❌ ${so} => ${rp}（非捆绑 Qt）`);
+        } else {
+          logger.ok(`✓ ${so} => 捆绑 ${path.basename(rp)}`);
+        }
+      }
+
+      // D. 依赖解析统计（信息性）
+      logger.log(`  已解析依赖 ${Object.keys(resolved).length} 项，缺库 ${missing.length} 项`);
     } catch (e) {
       logger.warn(`⚠  ldd 检查失败（非 Linux 或权限问题）：${e.message.split('\n')[0]}`);
     }
