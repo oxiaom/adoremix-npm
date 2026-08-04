@@ -153,6 +153,13 @@ function runDoctor(workdir, opts) {
     logger.ok(`✓ Node.js v${nodeVer}`);
   }
 
+  // 1.5 安装目录不能含中文等非 ASCII 字符（AdoreMix 在含中文路径下运行会出问题）
+  if (/[^\x00-\x7F]/.test(workdir)) {
+    issues.push({ type: 'workdir-nonascii', severity: 'error', msg: `安装目录含非 ASCII 字符（中文等）：${workdir}。AdoreMix 在含中文的路径下运行会出问题，请改用纯英文路径重装（Windows 例 C:\\adoremix，Linux 例 /opt/adoremix）。` });
+    logger.error(`❌ 安装目录含非 ASCII 字符（中文等）：${workdir}`);
+    logger.log(`    请用纯英文路径重新安装：adoremix install --workdir <纯英文路径> --force`);
+  }
+
   // 2. native 包是否加载
   let native;
   try {
