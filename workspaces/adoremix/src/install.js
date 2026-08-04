@@ -196,7 +196,9 @@ async function runInstall(opts) {
   deployWebuiIfPresent(workdir);
 
   const config = require('./config');
-  const cfgOk = await config.ensureConfig(workdir, { interactive: opts.interactive !== false, force: opts.force });
+  // install 的 --force 只刷新二进制/资源，**不覆盖已存在的 config.ini**（避免客户升级时配置丢失）。
+  // 需要重建配置请用：adoremix config init --force
+  const cfgOk = await config.ensureConfig(workdir, { interactive: opts.interactive !== false, force: false });
   if (!cfgOk) {
     logger.warn('配置未生成。请稍后运行 adoremix config init');
   }

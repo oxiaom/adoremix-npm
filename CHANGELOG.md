@@ -2,6 +2,34 @@
 
 本文件记录 @oxiaom/adoremix 各版本变更。版本号同步主包 + 4-6 个平台子包。
 
+## 1.0.24 — 2026-08-04
+
+### doctor（解决 Linux 运行中崩溃定位）
+- **全面检查所有依赖库版本兼容性**：ldd 检查从"只报缺库"升级为逐项核对所有依赖的版本与匹配：
+  - **libstdc++**：需 ≥ `GLIBCXX_3.4.29`（Qt 5.15 要求，GCC 9 时代符号）。系统 libstdc++ 太旧会在运行中 undefined symbol 崩溃，最贴合"启动一会儿就崩"。
+  - **glibc**：需 ≥ `GLIBC_2.34`（二进制在 Ubuntu 22.04 编译，Ubuntu < 22.04 会直接加载失败）。
+  - **Qt 捆绑一致性**：确认加载的是捆绑 `lib/` 里的 Qt 5.15.3，而非系统 Qt（版本不匹配会崩）。
+- 新增"已解析依赖 N 项，缺库 M 项"统计，方便把输出贴回排障。
+- 缺库/ICU70 的 `--fix` 逻辑保留不变。
+
+### 安装（升级安全）
+- **`adoremix install --force` 不再覆盖已存在的 config.ini**：`--force` 只刷新二进制/资源，保留客户自定义配置（端口、设备等）。需要重建配置请用 `adoremix config init --force`。
+
+## 1.0.23 — 2026-08-02
+
+### 平台：Windows win32-x64（修复运行即崩）
+- **统一 Qt 5.15.2 mingw81_64（64 位）**：此前包内 `AdoreMixV8X.exe` 是 64 位（Qt 5.15.2 构建），但 Qt5*.dll 是 **32 位 Qt 5.9.0**（由旧的 split-zip 从 32 位部署目录拷入）。64 位 exe 加载 32 位 DLL → 启动即 `0xc000007b` 崩溃。
+- 重新编译 exe + sqlitecipher 插件，native 内全部 Qt DLL/插件/MinGW 运行时统一为 64 位 Qt 5.15.2；移除 32 位残留（`libgcc_s_sjlj-1.dll`、`qnativewifibearer.dll`、`qsqlmysql.dll`）。
+- 构建脚本 `build-win32-x64.sh` 的 windeployqt 改用纯净 PATH：本机 PATH 里的旧 Qt 5.9（`G:\Qt\Qt5.9.0\5.9\mingw53_32\bin`）曾导致 windeployqt 把 32 位 5.9 DLL 部署进 native。
+
+### 升级提示（Windows 老版本客户）
+只更新 npm 包**不会**生效——`adoremix start` 优先用工作目录里 `install` 时复制的二进制，需刷新工作目录：
+```bash
+npm install -g @oxiaom/adoremix@latest
+adoremix install --force     # 刷新工作目录新二进制/资源（v1.0.24 起保留 config.ini）
+adoremix restart
+```
+
 ## 1.0.22 — 2026-07-01
 
 ### TTS

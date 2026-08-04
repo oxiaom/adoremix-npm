@@ -609,6 +609,39 @@ v1.0.3+ 已经把所有依赖打包进 `lib/`，正常情况不会缺。如果�
 adoremix doctor --fix    # 自动识别 + apt install
 ```
 
+### Windows 启动即崩（0xc000007b / 64 位 exe + 32 位 Qt DLL）
+
+v1.0.22 及更早的 win32-x64 包内 `AdoreMixV8X.exe` 是 64 位，但 Qt5*.dll 是 32 位 Qt 5.9.0，64 位 exe 加载 32 位 DLL → 启动即崩。**v1.0.23 起已统一为 64 位 Qt 5.15.2。** 老版本升级：
+
+```bash
+npm install -g @oxiaom/adoremix@latest
+adoremix install --force     # 刷新工作目录新二进制（不覆盖 config.ini）
+adoremix restart
+```
+
+### Linux Ubuntu 运行中崩溃（库不兼容）
+
+多为系统库版本不兼容，最典型三种：
+
+- **libstdc++ 太旧**：捆绑 Qt 5.15 需 `GLIBCXX_3.4.29`（GCC 9 时代符号，Ubuntu 20.04+），太旧会在运行中 undefined symbol 崩溃（"启动一会儿就崩"）。
+- **glibc 太旧**：需 `GLIBC_2.34`（二进制在 Ubuntu 22.04 编译，Ubuntu < 22.04 直接加载失败）。
+- **缺 libicu70 / 其他库**：Debian 12 / 树莓派 OS / Armbian 等 apt 只有 libicu72，缺 libicu70。
+
+排查：
+
+```bash
+adoremix doctor        # v1.0.24 起逐项核对所有依赖版本（libstdc++/glibc/Qt 捆绑/缺库）
+adoremix doctor --fix  # 自动装 ICU70 + apt 可装缺库
+```
+
+若仍崩，抓启动错误回传：
+
+```bash
+dmesg | tail
+# 或前台跑看 stderr：
+./AdoreMixV8.0.17_console_linuxx64 config.ini
+```
+
 ### TTS 不工作
 
 ```bash
