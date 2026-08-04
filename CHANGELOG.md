@@ -2,6 +2,16 @@
 
 本文件记录 @oxiaom/adoremix 各版本变更。版本号同步主包 + 4-6 个平台子包。
 
+## 1.0.26 — 2026-08-04
+
+### doctor / install（路径与环境）
+- **安装目录不能含中文等非 ASCII 字符**：AdoreMix 在含中文路径下运行会出问题。doctor 现在会检出非 ASCII 路径并提示用纯英文路径重装（Windows 例 `C:\adoremix`，Linux 例 `/opt/adoremix`）。
+- **`adoremix install` 前置拦截**：工作目录含中文等非 ASCII 直接拒绝安装，从源头防止装出问题路径。
+- **doctor 检测陈旧工作目录**：比对 `.adoremix-installed` 记录版本 vs 当前包版本，不一致提示 `adoremix install --force` 刷新二进制/资源（保留 config.ini），避免升级后工作目录还在用旧二进制。
+
+### 构建工具（防回归）
+- **split-zip win32 保护**：`scripts/split-zip.js` 的 win32 默认源是旧的 32 位 Qt 5.9 目录，用它 split 会把已修复的 64 位 Qt 5.15.2 native 覆盖回坏状态。现在默认拦截，需显式 `--win32 <新源>` 或 `--win32-force`。
+
 ## 1.0.25 — 2026-08-04
 
 ### 安装（升级安全）
