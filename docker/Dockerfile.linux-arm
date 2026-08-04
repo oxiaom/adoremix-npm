@@ -3,13 +3,14 @@
 # 在 x64 主机上用 docker buildx + QEMU 跨架构编译 Linux ARM (armhf / armv7) AdoreMix。
 # 用法见 docker/build-linux-arm.sh。
 
-FROM --platform=linux/arm/v7 arm32v7/ubuntu:22.04
+FROM --platform=linux/arm/v7 arm32v7/debian:11
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG ADORE_VERSION=8.0.17
 ARG TARGET_BIN=AdoreMixV8.0.17_console_linuxarm
 
-RUN apt-get update && \
+RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g; s|security.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list 2>/dev/null || true; \
+    apt-get update && \
     (apt-get install -y --no-install-recommends \
         build-essential \
         qtbase5-dev \
@@ -28,6 +29,8 @@ RUN apt-get update && \
         libmp3lame-dev \
         libmariadb-dev \
         libsqlite3-dev \
+        libicu-dev \
+        libpcre3 \
         file \
         patchelf \
         wget \
@@ -106,7 +109,7 @@ RUN SUBDIR=$(ls -d QtCipherSqlitePlugin-develop/QtCipherSqlitePlugin-develop 2>/
 # 2) 修复 .pro 硬编码路径 + 改 TARGET
 RUN sed -i \
         -e 's|-L/opt/qt5\.[0-9][^ ]*plugins/sqldrivers||g' \
-        -e 's|AdoreMixV8\.0\.17_console_linuxarm0|'${TARGET_BIN}'|g' \
+        -e 's|^TARGET = .*|TARGET = '${TARGET_BIN}'|' \
         AdoreMix.pro && \
     grep -E '^(TARGET|LIBS)' AdoreMix.pro
 
@@ -143,8 +146,11 @@ RUN QT_PLUGINS=$(qmake -query QT_INSTALL_PLUGINS) && \
     cp /usr/share/qt5/translations/qtbase_*.qm /out/translations/ 2>/dev/null || true
 
 RUN for lib in libhiredis libopus libopusfile libmp3lame libssl libcrypto \
-               libsqlite3 libmariadb libstdc++ libgcc_s libdouble-conversion libpcre2-16; do \
-        find /usr/lib -name "${lib}*.so*" -exec cp -a {} /out/lib/ \; 2>/dev/null ; \
+               libsqlite3 libmariadb libstdc++ libgcc_s libdouble-conversion libpcre2-16 \
+               libicuuc libicui18n libicudata \
+               libgssapi_krb5 libkrb5 libk5crypto libkrb5support libcom_err libkeyutils \
+               libpcre libz libglib-2.0; do \
+        find /lib /usr/lib -name "${lib}*.so*" -exec cp -a {} /out/lib/ \; 2>/dev/null ; \
     done
 
 RUN printf '[Paths]\nPlugins=./\nLibraries=./lib\n' > /out/qt.conf
@@ -157,7 +163,8 @@ RUN cp -r etc /out/etc 2>/dev/null || mkdir -p /out/etc ; \
     done ; \
     which lame && cp $(which lame) /out/lame && chmod 0755 /out/lame || true
 
-RUN cd /out && patchelf --set-rpath '$ORIGIN/lib' ${TARGET_BIN} 2>/dev/null || true
+# --force-rpath 强制 DT_RPATH（可传递）：Qt .so 的传递依赖（ICU 等）也从 $ORIGIN/lib 解析，包自包含。
+RUN cd /out && patchelf --set-rpath '$ORIGIN/lib' --force-rpath ${TARGET_BIN} 2>/dev/null || true
 RUN find /out -type l -exec sh -c 'target=$(readlink -f "$1") && [ -n "$target" ] && rm "$1" && cp "$target" "$1"' _ {} \; 2>/dev/null ; \
     find /out -xtype l -delete 2>/dev/null
 

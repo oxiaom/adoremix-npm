@@ -207,12 +207,14 @@ function runDoctor(workdir, opts) {
         logger.ok(`✓ 动态库依赖完整`);
       } else {
         logger.error(`❌ 缺动态库：${missing.join(', ')}`);
-        // 分类：apt 可装 / ICU 70 跨发行版兜底 / 完全未知
+        // 分类：apt 可装 / ICU(分已知 70 / 其他版本) / 完全未知
         const pkgs = [];
         const icu70 = [];
+        const icuOther = [];
         const unknown = [];
         for (const lib of missing) {
           if (ICU70_LIBS.includes(lib)) icu70.push(lib);
+          else if (lib.startsWith('libicu')) icuOther.push(lib);
           else if (LIB_TO_PKG[lib]) pkgs.push(LIB_TO_PKG[lib]);
           else unknown.push(lib);
         }
@@ -236,10 +238,10 @@ function runDoctor(workdir, opts) {
           }
         }
 
-        // 2) ICU 70 跨发行版兜底（Debian 12 / 树莓派 OS / Armbian 等无 libicu70）
+        // 2) ICU 70 跨发行版兜底（旧包，Debian 12 / 树莓派 OS / Armbian 等无 libicu70）
         let icuSolved = icu70.length === 0;
         if (icu70.length > 0) {
-          const icuMsg = `ICU 70 缺失（${icu70.join(', ')}）— 二进制在 Ubuntu 22.04 编译，Debian 12 等需补 libicu70`;
+          const icuMsg = `ICU 70 缺失（${icu70.join(', ')}）— 旧包在 Ubuntu 22.04 编译需 libicu70。建议先升级到最新版（v1.0.27+ 已把 ICU 捆绑进 lib/），或 doctor --fix 自动装 libicu70`;
           if (opts.fix) {
             if (tryFixIcu70()) {
               logger.ok('✓ libicu70 已安装（ICU 70 兜底）');
@@ -252,6 +254,13 @@ function runDoctor(workdir, opts) {
             logger.log(`    自动修复：adoremix doctor --fix（从 Ubuntu 官方源下载 libicu70 .deb）`);
             issues.push({ type: 'icu70', severity: 'error', msg: icuMsg });
           }
+        }
+
+        // 2.5) 其他版本 ICU 缺失（v1.0.27+ 已捆绑 ICU，正常不应缺；缺了说明安装目录 lib/ 不完整）
+        if (icuOther.length > 0) {
+          const icuOtherMsg = `ICU 缺失（${icuOther.join(', ')}）。v1.0.27+ 已把 ICU 捆绑进 lib/，出现此错误说明安装目录 lib/ 不完整，请重新 adoremix install --force 刷新；或系统缺对应版本 libicu。`;
+          issues.push({ type: 'icu-other', severity: 'error', msg: icuOtherMsg });
+          logger.error(`❌ ${icuOtherMsg}`);
         }
 
         // 3) 未解决的记 issue

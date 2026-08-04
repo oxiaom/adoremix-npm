@@ -11,13 +11,14 @@
 #   5) 收集二进制 + 依赖 .so + Qt plugins + 资源 到 /out
 # 最终产物 /out 直接对应 workspaces/linux-arm64/native/。
 
-FROM --platform=linux/arm64 arm64v8/ubuntu:22.04
+FROM --platform=linux/arm64 arm64v8/debian:11
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG ADORE_VERSION=8.0.17
 ARG TARGET_BIN=AdoreMixV8.0.17_console_linuxarm64
 
-RUN apt-get update && \
+RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g; s|security.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list 2>/dev/null || true; \
+    apt-get update && \
     (apt-get install -y --no-install-recommends \
         build-essential \
         qtbase5-dev \
@@ -36,6 +37,8 @@ RUN apt-get update && \
         libmp3lame-dev \
         libmariadb-dev \
         libsqlite3-dev \
+        libicu-dev \
+        libpcre3 \
         file \
         patchelf \
         wget \
@@ -124,7 +127,7 @@ RUN SUBDIR=$(ls -d QtCipherSqlitePlugin-develop/QtCipherSqlitePlugin-develop 2>/
 #    同时把 TARGET 改成 arm64 二进制名
 RUN sed -i \
         -e 's|-L/opt/qt5\.[0-9][^ ]*plugins/sqldrivers||g' \
-        -e 's|AdoreMixV8\.0\.17_console_linuxarm0|'${TARGET_BIN}'|g' \
+        -e 's|^TARGET = .*|TARGET = '${TARGET_BIN}'|' \
         AdoreMix.pro && \
     grep -E '^(TARGET|LIBS)' AdoreMix.pro
 
@@ -167,8 +170,11 @@ RUN QT_PLUGINS=$(qmake -query QT_INSTALL_PLUGINS) && \
 
 # 第三方库
 RUN for lib in libhiredis libopus libopusfile libmp3lame libssl libcrypto \
-               libsqlite3 libmariadb libstdc++ libgcc_s libdouble-conversion libpcre2-16; do \
-        find /usr/lib -name "${lib}*.so*" -exec cp -a {} /out/lib/ \; 2>/dev/null ; \
+               libsqlite3 libmariadb libstdc++ libgcc_s libdouble-conversion libpcre2-16 \
+               libicuuc libicui18n libicudata \
+               libgssapi_krb5 libkrb5 libk5crypto libkrb5support libcom_err libkeyutils \
+               libpcre libz libglib-2.0; do \
+        find /lib /usr/lib -name "${lib}*.so*" -exec cp -a {} /out/lib/ \; 2>/dev/null ; \
     done
 
 # qt.conf（让 Qt 知道 plugins 在同级目录）
@@ -190,7 +196,8 @@ RUN mkdir -p /out/etc /out/conf /out/html ; \
     echo "=== /out 顶层 ===" && ls -la /out/ | head -30
 
 # patchelf 修复 RPATH（让二进制到 lib/ 下找依赖）
-RUN cd /out && patchelf --set-rpath '$ORIGIN/lib' ${TARGET_BIN} 2>/dev/null || true
+# --force-rpath 强制 DT_RPATH（可传递）：Qt .so 的传递依赖（ICU 等）也从 $ORIGIN/lib 解析，包自包含。
+RUN cd /out && patchelf --set-rpath '$ORIGIN/lib' --force-rpath ${TARGET_BIN} 2>/dev/null || true
 
 # 解引用所有 symlink -> 实际文件
 # Windows 主机文件系统不支持相对路径 symlink，docker cp 会因 symlink 失败而静默丢目录
