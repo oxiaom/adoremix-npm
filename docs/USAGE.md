@@ -51,12 +51,28 @@ adoremix start --daemon
 
 | 平台 | 架构 | 状态 |
 |---|---|---|
-| Windows | x64 | ✅ |
+| Windows | x64 | ✅（需英文安装路径，见下） |
 | Linux | x64 | ✅ |
 | Linux | ARM64 (aarch64) | ✅ |
 | Linux | ARM (armv7/armhf) | ✅ |
 | macOS | x64 (Intel) | ✅ |
 | macOS | ARM64 (Apple Silicon) | ✅ |
+
+### Linux 发行版兼容性（v1.0.27+）
+
+Linux 包为**自包含**构建：Qt 5.15.2 + ICU 67 等全部依赖捆绑在 `lib/`（不依赖系统 Qt/ICU），只要求系统 **glibc ≥ 2.29**：
+
+| 发行版 | 版本 | glibc | 支持 |
+|---|---|---|---|
+| Ubuntu | 20.04+ | 2.31+ | ✅ |
+| Ubuntu 优麒麟 | 20.04+ | 2.31+ | ✅ |
+| Debian | 11+ | 2.31+ | ✅ |
+| Rocky / AlmaLinux | 9 | 2.34 | ✅ |
+| 银河麒麟 / 统信 UOS | 22.04 级 | 2.31+ | ✅ |
+| 统信 UOS 20 / 龙蜥 Anolis 8 / openEuler 20.03 | — | 2.28 | ⚠️ 暂不支持（glibc 差 0.01，后续版本适配） |
+| CentOS 7 / 中标麒麟 | 7 | 2.17 | ❌（Qt 5.15 本身要求更高，无法支持） |
+
+> **安装目录不能含中文等非 ASCII 字符**（Windows/Linux 通用）：AdoreMix 在含中文路径下运行会出问题。Windows 用 `C:\adoremix`、Linux 用 `/opt/adoremix` 这类纯英文路径。`adoremix doctor` 会检测并提示。
 
 **软件要求**：
 - Node.js ≥ 16（推荐 20 LTS）

@@ -2,6 +2,20 @@
 
 本文件记录 @oxiaom/adoremix 各版本变更。版本号同步主包 + 4-6 个平台子包。
 
+## 1.0.27 — 2026-08-05
+
+### Linux（重大：构建基线 + 自包含）
+- **构建基线 Ubuntu 22.04 → Debian 11**：glibc 要求从 2.34 降到 **2.29**，支持面扩大：
+  - ✅ Ubuntu 20.04 / 22.04 / 24.04、优麒麟 20.04+、Debian 11 / 12、Rocky / AlmaLinux 9
+  - ⚠️ 统信 UOS 20 / 龙蜥 Anolis 8 / openEuler 20.03（glibc 2.28）暂不支持，后续版本适配
+  - ❌ CentOS 7 / 中标麒麟（glibc 2.17）：Qt 5.15 本身不支持
+- **全依赖捆绑自包含**：Qt 5.15.2 + ICU 67 + kerberos/glib/pcre/z 等全部传递依赖捆绑进 `lib/`，并用 `DT_RPATH($ORIGIN/lib)` 传递解析 —— 不再依赖系统 Qt/ICU/kerberos，任意 glibc ≥ 2.29 的发行版可直接运行（已在 debian:12-slim 裸容器验证启动）。
+- **构建加速**：apt 走清华镜像（国内构建从几小时降到几分钟）。
+- x64 / arm64 / arm 三个架构全部重建。
+
+### doctor
+- ICU 识别泛化到任意版本；捆绑 ICU 后跨发行版不再缺 ICU。
+
 ## 1.0.26 — 2026-08-04
 
 ### doctor / install（路径与环境）
