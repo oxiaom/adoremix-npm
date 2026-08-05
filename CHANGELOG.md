@@ -2,6 +2,13 @@
 
 本文件记录 @oxiaom/adoremix 各版本变更。版本号同步主包 + 4-6 个平台子包。
 
+## 1.0.28 — 2026-08-05
+
+### 平台
+- **放弃 macOS Intel（darwin-x64）支持**：Intel Mac 二进制从未发布（Intel runner 排队问题无法解决），正式放弃。macOS 仅支持 Apple Silicon（arm64）。
+  - 移除 `workspaces/darwin-x64`、发布脚本/CI/依赖声明中的 darwin-x64 引用。
+  - Intel Mac 用户无法安装（`adoremix` 会提示不支持的平台）。
+
 ## 1.0.27 — 2026-08-05
 
 ### Linux（重大：构建基线 + 自包含）
@@ -105,5 +112,5 @@ adoremix restart
 
 ## 已知限制
 
-- **darwin-x64（macOS Intel）**：GitHub Actions 的 Intel macOS runner 限额紧，首次编译一直排队。Intel Mac 用户暂时可通过 Rosetta 运行 darwin-arm64 包，或等 Intel runner 可用。
+- **darwin-x64（macOS Intel）**：已放弃支持（v1.0.28 起）。macOS 仅支持 Apple Silicon。
 - **macOS 开机自启**：`adoremix service install` 暂不支持 macOS（无 launchd 实现），用 `adoremix start --daemon` + 手动 LaunchAgent。

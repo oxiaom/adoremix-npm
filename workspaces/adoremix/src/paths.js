@@ -10,7 +10,6 @@ const PLATFORM_PKG = {
   'linux_x64': '@oxiaom/adoremix-linux-x64',
   'linux_arm64': '@oxiaom/adoremix-linux-arm64',
   'linux_arm': '@oxiaom/adoremix-linux-arm',
-  'darwin_x64': '@oxiaom/adoremix-darwin-x64',
   'darwin_arm64': '@oxiaom/adoremix-darwin-arm64'
 }[PLATFORM_KEY];
 
@@ -21,7 +20,7 @@ function loadNative() {
   if (_native) return _native;
   if (_loadError) throw _loadError;
   if (!PLATFORM_PKG) {
-    _loadError = new Error(`不支持的平台：${PLATFORM_KEY}。当前支持 win32-x64 / linux-x64 / linux-arm64 / linux-arm / darwin-x64 / darwin-arm64。`);
+    _loadError = new Error(`不支持的平台：${PLATFORM_KEY}。当前支持 win32-x64 / linux-x64 / linux-arm64 / linux-arm / darwin-arm64（macOS 仅支持 Apple Silicon，Intel 已放弃）。`);
     throw _loadError;
   }
   try {

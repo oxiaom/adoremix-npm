@@ -9,7 +9,6 @@
     "workspaces/linux-x64",
     "workspaces/linux-arm64",
     "workspaces/linux-arm",
-    "workspaces/darwin-x64",
     "workspaces/darwin-arm64"
   ],
   "scripts": {

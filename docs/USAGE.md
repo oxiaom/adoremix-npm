@@ -55,7 +55,7 @@ adoremix start --daemon
 | Linux | x64 | ✅ |
 | Linux | ARM64 (aarch64) | ✅ |
 | Linux | ARM (armv7/armhf) | ✅ |
-| macOS | x64 (Intel) | ✅ |
+| macOS | x64 (Intel) | ❌（已放弃，仅支持 Apple Silicon） |
 | macOS | ARM64 (Apple Silicon) | ✅ |
 
 ### Linux 发行版兼容性（v1.0.27+）
@@ -704,7 +704,7 @@ adoremix version   # 应 ≥ 1.0.18
 
 ### Q: macOS 支持吗？
 
-**支持**（v1.0.19+）。`npm install -g @oxiaom/adoremix` 在 macOS Intel（x64）和 Apple Silicon（arm64）上都可正常安装运行。首次启动若被 Gatekeeper 拦截，运行 `xattr -d com.apple.quarantine <二进制路径>` 即可。
+**支持 Apple Silicon（arm64）**（v1.0.19+）。macOS **Intel（x64）已放弃支持**（自 v1.0.28 起不再提供 Intel 包）。首次启动若被 Gatekeeper 拦截，运行 `xattr -d com.apple.quarantine <二进制路径>` 即可。
 
 注意：macOS 上 `adoremix service install`（开机自启）暂未实现，用 `adoremix start --daemon` 替代。
 

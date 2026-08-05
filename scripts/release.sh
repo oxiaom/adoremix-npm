@@ -108,7 +108,6 @@ node -e "
     'workspaces/linux-x64/package.json',
     'workspaces/linux-arm64/package.json',
     'workspaces/linux-arm/package.json',
-    'workspaces/darwin-x64/package.json',
     'workspaces/darwin-arm64/package.json'
   ];
   for (const rel of targets) {

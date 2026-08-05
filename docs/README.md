@@ -86,7 +86,7 @@ adoremix service install
 | Linux | x64 | `@oxiaom/adoremix-linux-x64` |
 | Linux | ARM64 | `@oxiaom/adoremix-linux-arm64` |
 | Linux | ARM (armhf) | `@oxiaom/adoremix-linux-arm` |
-| macOS | x64 (Intel) | `@oxiaom/adoremix-darwin-x64`（待编译，可用 Rosetta 跑 arm64 包） |
+| macOS | x64 (Intel) | ❌ 已放弃支持 |
 | macOS | ARM64 (Apple Silicon) | `@oxiaom/adoremix-darwin-arm64`（已支持） |
 
 npm 会自动按当前平台拉对应子包，**不用手动选**。
@@ -119,7 +119,6 @@ adoremix-npm/
 │   ├── linux-x64/         # Linux x64 原生包
 │   ├── linux-arm64/       # Linux ARM64 原生包
 │   ├── linux-arm/         # Linux ARM 原生包
-│   ├── darwin-x64/        # macOS Intel 原生包
 │   └── darwin-arm64/      # macOS Apple Silicon 原生包
 ├── docker/                # Docker 构建脚本（Linux 4 平台）
 ├── docker/source-repo/    # 私有源码仓库的 CI 配置（darwin 编译）

@@ -35,6 +35,6 @@ file workspaces/darwin-arm64/native/AdoreMixV8.0.17_console_darwinarm64
 
 ## 注意事项
 
-- 在 Intel Mac 上无法运行（请用 darwin-x64 子包）
+- 在 Intel Mac 上无法运行（macOS Intel 已放弃支持，仅支持 Apple Silicon）
 - 首次运行若被 Gatekeeper 拦截：`xattr -d com.apple.quarantine /path/to/AdoreMixV8.0.17_console_darwinarm64`
 - 若提示"无法验证开发者"：系统偏好设置 → 安全性与隐私 → 允许打开

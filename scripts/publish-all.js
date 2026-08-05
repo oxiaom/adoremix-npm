@@ -19,7 +19,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
-const SUBPKGS = ['win32-x64', 'linux-x64', 'linux-arm64', 'linux-arm', 'darwin-x64', 'darwin-arm64'];
+const SUBPKGS = ['win32-x64', 'linux-x64', 'linux-arm64', 'linux-arm', 'darwin-arm64'];
 const MAIN_PKG_DIR = 'adoremix';
 
 function readPkg(rel) {

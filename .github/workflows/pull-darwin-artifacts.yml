@@ -3,8 +3,7 @@ name: pull-darwin-artifacts
 # 从【私有源码仓库】（默认 oxiaom/adoremix-source）下载 macOS 二进制 release 产物，
 # 解压到 workspaces/darwin-{x64,arm64}/native/，commit 到 main 分支。
 #
-# 源码仓库的 build-darwin.yml 完成编译后会发布 v<version> tag + 两个 tar.gz asset：
-#   - adoremix-darwin-x64-<version>.tar.gz
+# 源码仓库的 build-darwin.yml 完成编译后会发布 v<version> tag + tar.gz asset：
 #   - adoremix-darwin-arm64-<version>.tar.gz
 #
 # 这个 workflow 拉到 npm 公开仓库后，由 publish.yml 把子包发到 npm registry。
@@ -31,8 +30,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: darwin-x64
-            arch: x64
           - platform: darwin-arm64
             arch: arm64
     steps:

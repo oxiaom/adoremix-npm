@@ -15,7 +15,6 @@
     "@oxiaom/adoremix-linux-x64": "^1.0.0",
     "@oxiaom/adoremix-linux-arm64": "^1.0.0",
     "@oxiaom/adoremix-linux-arm": "^1.0.0",
-    "@oxiaom/adoremix-darwin-x64": "^1.0.0",
     "@oxiaom/adoremix-darwin-arm64": "^1.0.0"
   },
   "dependencies": {
