@@ -2,6 +2,18 @@
 
 本文件记录 @oxiaom/adoremix 各版本变更。版本号同步主包 + 4-6 个平台子包。
 
+## 1.0.30 — 2026-08-10
+
+### Linux(修复若干 bug,x64/arm64/arm 三架构重建)
+- **etc 目录扁平化**:x64/arm 之前是 `etc/etc/docroot` 嵌套,应用读的是扁平 `etc/docroot` → 网页资源 404。已改 `cp -r etc/.` 并重建。
+- **捆绑 lame**:TTS 转 mp3 调用外部命令 `lame`,之前只装了库没装命令 → 转码失败。已补装并捆绑。
+- **补齐生产资源**:源码 etc 不完整(static 只有 .map、xcx 不全、缺 bangzhu/templates/ttys 部分 SQL),重建会丢网页资源。已把完整 docroot/static JS/xcx/bangzhu/templates/ttys 补回包内,并同步回源码。
+
+## 1.0.29 — 2026-08-04
+
+### Windows
+- **补 .Adore.db**:win32 包的 .Adore.db 从未提交,Windows 安装缺数据库。已提交并发布。
+
 ## 1.0.28 — 2026-08-05
 
 ### 平台
