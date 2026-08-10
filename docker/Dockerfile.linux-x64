@@ -26,6 +26,7 @@ RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g; s|security.debian.o
         libopus-dev \
         libopusfile-dev \
         libmp3lame-dev \
+        lame \
         libmariadb-dev \
         libsqlite3-dev \
         libicu-dev \
@@ -156,7 +157,8 @@ RUN for lib in libhiredis libopus libopusfile libmp3lame libssl libcrypto \
 RUN printf '[Paths]\nPlugins=./\nLibraries=./lib\n' > /out/qt.conf
 
 # 业务资源
-RUN cp -r etc /out/etc 2>/dev/null || mkdir -p /out/etc ; \
+# 用 cp -r etc/. /out/etc/ 避免嵌套：cp -r etc /out/etc 会变成 /out/etc/etc，应用读的是扁平 etc/docroot
+RUN mkdir -p /out/etc && cp -r etc/. /out/etc/ 2>/dev/null || true ; \
     cp -r conf /out/conf 2>/dev/null || mkdir -p /out/conf ; \
     cp -r html /out/html 2>/dev/null || mkdir -p /out/html ; \
     for f in tts.js find.js findsc.js xiaoboshu.py .Adore.db; do \
