@@ -29,6 +29,17 @@ function ensureExec(binPath) {
   }
 }
 
+// 启动前检查工作目录关键文件：config.ini / .Adore.db 缺失会直接导致应用读不到配置/数据库
+function warnMissingWorkdirFiles(workdir) {
+  const missing = [];
+  if (!fs.existsSync(path.join(workdir, 'config.ini'))) missing.push('config.ini');
+  if (!fs.existsSync(path.join(workdir, '.Adore.db'))) missing.push('.Adore.db');
+  if (missing.length) {
+    logger.warn(`⚠  工作目录 ${workdir} 缺少 ${missing.join('、')}，应用可能无法正确启动/读库。`);
+    logger.warn(`    请运行：adoremix install --force（刷新资源/数据库，保留 config.ini）`);
+  }
+}
+
 function startForeground(opts) {
   const native = opts.native;
   const workdir = opts.workdir;
@@ -44,6 +55,7 @@ function startForeground(opts) {
     throw new Error(`原生二进制不存在 ${bin}`);
   }
   ensureExec(bin);
+  warnMissingWorkdirFiles(workdir);
 
   const args = [path.basename(configPath)];
   logger.info(`spawn ${native.binName} ${args.join(' ')} (cwd=${workdir})`);
@@ -91,6 +103,7 @@ function startDaemon(opts) {
     throw new Error(`原生二进制不存在 ${bin}`);
   }
   ensureExec(bin);
+  warnMissingWorkdirFiles(workdir);
 
   const running = pidMgr.readPid(wp.pidfile);
   if (running && pidMgr.isRunning(running)) {

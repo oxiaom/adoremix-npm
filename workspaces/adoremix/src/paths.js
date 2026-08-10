@@ -37,7 +37,30 @@ function loadNative() {
   return _native;
 }
 
+// 检测已安装的工作目录：扫描常见路径找 .adoremix-installed 标记。
+// 这样 start/restart/stop 等命令在未显式传 --workdir 时，也会用到实际安装目录，
+// 避免 root 装了 /opt/adoremix 后用非 root 跑命令时解析到别处、找不到 .Adore.db/config.ini。
+function detectInstalledWorkdir() {
+  const candidates = [];
+  if (process.platform === 'win32') {
+    candidates.push(path.join(process.env.PROGRAMDATA || 'C:\\ProgramData', 'adoremix'));
+  } else {
+    candidates.push('/opt/adoremix');
+    const xdg = process.env.XDG_DATA_HOME;
+    if (xdg) candidates.push(path.join(xdg, 'adoremix'));
+    candidates.push(path.join(os.homedir(), '.local', 'share', 'adoremix'));
+  }
+  for (const c of candidates) {
+    try {
+      if (fs.existsSync(path.join(c, '.adoremix-installed'))) return c;
+    } catch (e) { /* 无权限读取则跳过 */ }
+  }
+  return null;
+}
+
 function defaultWorkdir() {
+  const detected = detectInstalledWorkdir();
+  if (detected) return detected;
   if (process.platform === 'win32') {
     const base = process.env.PROGRAMDATA || 'C:\\ProgramData';
     return path.join(base, 'adoremix');
