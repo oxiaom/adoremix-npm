@@ -425,6 +425,33 @@ function buildProgram() {
       }
     });
 
+  program
+    .command('uninstall')
+    .description('完全卸载：停服务 + 卸载 systemd 服务；加 --purge 删除工作目录（含配置/数据库，不可恢复）')
+    .option('--workdir <path>')
+    .option('--purge', '同时删除工作目录（含所有数据）')
+    .action(async (opts) => {
+      const fs = require('fs');
+      const workdir = resolveWorkdir(opts.workdir);
+      try {
+        const svc = require('./service');
+        svc.uninstall({ workdir });
+        logger.ok('系统服务已卸载');
+      } catch (e) {
+        logger.warn(`服务卸载跳过：${e.message}`);
+      }
+      try {
+        await runner.stop(runnerOpts(opts));
+      } catch (e) {
+        logger.warn(`停止跳过：${e.message}`);
+      }
+      if (opts.purge) {
+        fs.rmSync(workdir, { recursive: true, force: true });
+        logger.ok(`已删除工作目录 ${workdir}`);
+      }
+      logger.ok('卸载完成');
+    });
+
   return program;
 }
 
