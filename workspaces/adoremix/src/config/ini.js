@@ -1,6 +1,7 @@
 'use strict';
 
 const fs = require('fs');
+const path = require('path');
 const ini = require('ini');
 
 function read(configPath) {
@@ -10,6 +11,8 @@ function read(configPath) {
 }
 
 function write(configPath, obj) {
+  // 工作目录可能被 uninstall --purge 删掉，写 config.ini 前确保父目录存在
+  fs.mkdirSync(path.dirname(configPath), { recursive: true });
   const txt = ini.stringify(obj, {
     section: '',
     whitespace: true,
