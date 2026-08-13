@@ -34,6 +34,25 @@ function loadNative() {
     );
     throw _loadError;
   }
+  // 版本一致性校验：主包与平台子包必须同版本。
+  // 国内镜像（npmmirror 等）对平台子包同步可能滞后，导致 install 时嵌套了旧版子包，
+  // 应用就会加载到旧 native（如旧 ICU 版本），运行报缺库。这里给出明确指引。
+  try {
+    const mainVer = require('../package.json').version;
+    const subPkg = require(`${PLATFORM_PKG}/package.json`);
+    if (subPkg && subPkg.version && mainVer && subPkg.version !== mainVer) {
+      _native = null;
+      _loadError = new Error(
+        `平台子包版本不一致：主包 @oxiaom/adoremix@${mainVer}，但加载到 ${PLATFORM_PKG}@${subPkg.version}。\n` +
+        `  通常是 npm 镜像（npmmirror 等）没同步最新子包导致。请用官方源重装：\n` +
+        `  npm install -g @oxiaom/adoremix@${mainVer} --registry https://registry.npmjs.org`
+      );
+      throw _loadError;
+    }
+  } catch (e) {
+    if (e === _loadError) throw e;
+    // package.json 读不到等情况忽略，不阻塞
+  }
   return _native;
 }
 
