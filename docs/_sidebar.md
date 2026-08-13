@@ -14,6 +14,10 @@
   - [WebUI 切换](USAGE.md#webui-切换)
   - [健康检查](USAGE.md#健康检查)
 
+- **可选组件（仅 Linux）**
+  - [NGINX 静态加速](USAGE.md#nginx-静态加速)
+  - [设备配置管理 UI](USAGE.md#设备配置管理-uiconfig-manager)
+
 - **TTS 文字转语音**
   - [总览与对比](USAGE.md#tts-文字转语音)
   - [配置 TTS](USAGE.md#配置-tts)

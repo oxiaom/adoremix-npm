@@ -2,6 +2,26 @@
 
 本文件记录 @oxiaom/adoremix 各版本变更。版本号同步主包 + 4-6 个平台子包。
 
+## 1.0.38 — 2026-08-13
+
+### 可选组件：设备配置管理 UI（config-manager，仅 Linux）
+- 内置 Python Flask 应用，Web 界面管理设备（端口 9877，开机自启）。
+- 三个功能页：**配置 IP 地址 / 修改 config.ini / 查看运行日志**。
+- `adoremix config-manager install/uninstall/status`：检测 python3 + Flask，写 systemd 服务，路径参数化（`ADOREMIX_WORKDIR`）。
+- 仅 Linux（依赖 systemd）。
+
+## 1.0.37 — 2026-08-13
+
+### 可选组件：NGINX 静态加速（仅 Linux）
+- `adoremix nginx install/uninstall/status`：媒体文件走 nginx（端口 9876 挂 `etc/docroot`），减轻设备服务压力。
+- mp3 等媒体文件加 30 天缓存头，js/css/图片 7 天缓存。
+- 安装后 `Settings.preurl` 自动改为 `http://IP:9876/`；卸载还原到原端口。
+- 开机自启（systemd）。仅 Linux。
+
+### doctor 增强
+- 全面检查所有捆绑库从 `lib/` 加载（不只 glibc/libstdc++），防止版本不匹配。
+- 检测平台子包版本不一致（npm 镜像同步滞后），`--fix` 自动用官方源重装。
+
 ## 1.0.30 — 2026-08-10
 
 ### Linux(修复若干 bug,x64/arm64/arm 三架构重建)

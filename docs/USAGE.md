@@ -445,6 +445,41 @@ adoremix doctor --fix     # 检查 + 自动修复
 
 ---
 
+## 可选组件（仅 Linux）
+
+以下是**可选安装**的运维工具，仅支持 Linux（依赖 systemd），Windows 不可用。
+
+### NGINX 静态加速
+
+媒体文件（mp3 等）走 nginx 直接出，减轻 AdoreMix 设备服务压力。端口 9876，开机自启。
+
+```bash
+adoremix nginx install      # 安装并配置（preurl 自动改为 http://IP:9876/）
+adoremix nginx uninstall    # 卸载（preurl 还原到原 12080 端口）
+adoremix nginx status       # 查看状态
+```
+
+- 挂载静态目录 `etc/docroot`
+- mp3/wav/m4a 等媒体文件加 30 天缓存头，js/css/图片 7 天缓存
+- 安装完成后 `Settings.preurl` 自动改为 `http://<本机IP>:9876/`
+- 需 root，会自动 `apt/dnf install nginx`
+
+### 设备配置管理 UI（config-manager）
+
+Web 界面管理设备，端口 9877，开机自启。三个功能页：**配置 IP 地址 / 修改 config.ini / 查看运行日志**。
+
+```bash
+adoremix config-manager install      # 安装（检测 python3 + Flask，自动装）
+adoremix config-manager uninstall    # 卸载
+adoremix config-manager status       # 查看状态
+```
+
+- 访问：`http://<本机IP>:9877/`
+- 需 root + python3；Flask 缺失时自动 `python3 -m pip install flask`
+- 修改的 `config.ini` 指向 AdoreMix 工作目录（`ADOREMIX_WORKDIR` 环境变量）
+
+---
+
 ## 配置项详解
 
 配置文件在工作目录的 `config.ini`，用标准 INI 格式。可以用命令改，也可以直接编辑。
