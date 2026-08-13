@@ -47,6 +47,8 @@ function loadNative() {
         `  通常是 npm 镜像（npmmirror 等）没同步最新子包导致。请用官方源重装：\n` +
         `  npm install -g @oxiaom/adoremix@${mainVer} --registry https://registry.npmjs.org`
       );
+      _loadError.code = 'NATIVE_VERSION_MISMATCH';
+      _loadError.mainVersion = mainVer;
       throw _loadError;
     }
   } catch (e) {

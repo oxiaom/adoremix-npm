@@ -166,6 +166,25 @@ function runDoctor(workdir, opts) {
     native = paths.loadNative();
     logger.ok(`✓ 平台子包 ${native.pkgName}`);
   } catch (e) {
+    if (e && e.code === 'NATIVE_VERSION_MISMATCH') {
+      const mainVer = e.mainVersion || require('../package.json').version;
+      const fixCmd = `npm install -g @oxiaom/adoremix@${mainVer} --registry https://registry.npmjs.org`;
+      issues.push({ type: 'native-version-mismatch', severity: 'error', msg: e.message, fixCmd });
+      logger.error(`❌ ${e.message.split('\n')[0]}`);
+      logger.log(`    自动修复：adoremix doctor --fix（用官方源重装到 v${mainVer}）`);
+      logger.log(`    或手动执行：${fixCmd}`);
+      if (opts.fix) {
+        logger.info('==> 用官方源重装主包（含最新子包）...');
+        try {
+          execSync(fixCmd, { stdio: 'inherit' });
+          logger.ok('✓ 已重装，请重新运行 adoremix doctor 确认');
+        } catch (e2) {
+          logger.error(`重装失败：${(e2.message || '').split('\n')[0]}`);
+          logger.warn(`  请手动执行：${fixCmd}`);
+        }
+      }
+      return reportAndExit(issues, opts);
+    }
     issues.push({ type: 'native', severity: 'error', msg: e.message });
     logger.error(`❌ 平台子包未加载：${e.message.split('\n')[0]}`);
     return reportAndExit(issues, opts);
