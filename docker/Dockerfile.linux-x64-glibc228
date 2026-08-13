@@ -1,0 +1,35 @@
+# syntax=docker/dockerfile:1.4
+#
+# Linux x64 AdoreMix 低 glibc 构建工具链（Phase 2）：
+#   基镜像 AlmaLinux 8（glibc 2.28，gcc 8.5）。
+#   Qt 5.15.2 官方 gcc_64 通过 docker run -v 挂载（自带 ICU56，glibc 基线 2.17）。
+#   编译在 docker run 里执行（见 build-linux-x64-glibc228.sh）。
+#
+# 注意：Qt 官方 Linux 二进制仅有 x86_64（gcc_64），无 arm64/arm。
+
+FROM almalinux:8
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+# 阿里云镜像（AlmaLinux 8 官方 mirrorlist 国内访问慢）
+RUN sed -i -e 's|^mirrorlist=|#mirrorlist=|g' -e 's|^# *baseurl=https://repo.almalinux.org|baseurl=https://mirrors.aliyun.com|g' /etc/yum.repos.d/almalinux.repo
+
+# EPEL（阿里云）
+RUN dnf install -y epel-release && \
+    cat > /etc/yum.repos.d/epel.repo <<'EOF'
+[epel]
+name=Extra Packages for Enterprise Linux 8
+baseurl=https://mirrors.aliyun.com/epel/8/Everything/$basearch/
+enabled=1
+gpgcheck=0
+EOF
+
+# 工具链 + 第三方库（glibc 2.28 基线）
+RUN dnf install -y --setopt=tsflags=nodocs \
+        gcc-c++ make \
+        sqlite-devel openssl-devel glib2-devel pcre-devel zlib-devel \
+        hiredis-devel opus-devel opusfile-devel mariadb-devel \
+        patchelf file wget git which \
+    && dnf clean all
+
+CMD ["/bin/bash"]
