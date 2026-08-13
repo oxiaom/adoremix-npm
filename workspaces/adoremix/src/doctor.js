@@ -335,24 +335,35 @@ function runDoctor(workdir, opts) {
         }
       }
 
-      // C. Qt 捆绑一致性：必须加载捆绑 lib/ 里的 Qt，不能加载系统 Qt（版本可能不匹配）
-      const qtSonames = Object.keys(resolved).filter(k => /^libQt5.*\.so\.5$/.test(k));
+      // C. 捆绑库一致性：自包含包中，Qt/ICU/pcre/z/glib/krb5/sqlite/ssl 等应全部从捆绑 lib/ 解析。
+      //    若某个库从系统路径加载，说明捆绑不完整或 RPATH 未生效，版本可能不匹配（如系统 ICU72 vs 捆绑 ICU67）。
+      const BUNDLED_PREFIXES = [
+        'libQt5', 'libicu', 'libpcre', 'libz', 'libglib-2.0',
+        'libgssapi_krb5', 'libkrb5', 'libk5crypto', 'libkrb5support',
+        'libcom_err', 'libkeyutils', 'libdouble-conversion', 'libsqlite3',
+        'libssl', 'libcrypto', 'libhiredis', 'libmariadb', 'libopus', 'libmp3lame'
+      ];
       const libDirNorm = path.normalize(libDir);
-      for (const so of qtSonames) {
+      let bundledChecked = 0;
+      let bundledFromSystem = 0;
+      for (const so of Object.keys(resolved)) {
+        if (!BUNDLED_PREFIXES.some(p => so.startsWith(p))) continue;
+        bundledChecked++;
         const rp = resolved[so];
         if (!rp) {
-          issues.push({ type: 'qt-missing', severity: 'error', msg: `${so} 未能解析，捆绑 Qt 加载失败` });
-          logger.error(`❌ ${so} 未解析（捆绑 Qt 加载失败）`);
+          issues.push({ type: 'bundled-lib-missing', severity: 'error', msg: `${so} 未能解析（应捆绑在 lib/）` });
+          logger.error(`❌ ${so} 未解析（捆绑库加载失败）`);
         } else if (!path.normalize(rp).startsWith(libDirNorm + path.sep)) {
-          issues.push({ type: 'qt-bundle', severity: 'error', msg: `${so} 加载系统 Qt：${rp}（应为捆绑 ${libDir}），版本可能不匹配` });
-          logger.error(`❌ ${so} => ${rp}（非捆绑 Qt）`);
+          bundledFromSystem++;
+          issues.push({ type: 'bundled-lib-system', severity: 'error', msg: `${so} 从系统加载：${rp}（应捆绑 ${libDir}），版本可能不匹配` });
+          logger.error(`❌ ${so} => ${rp}（非捆绑，可能版本不匹配）`);
         } else {
           logger.ok(`✓ ${so} => 捆绑 ${path.basename(rp)}`);
         }
       }
 
       // D. 依赖解析统计（信息性）
-      logger.log(`  已解析依赖 ${Object.keys(resolved).length} 项，缺库 ${missing.length} 项`);
+      logger.log(`  已解析依赖 ${Object.keys(resolved).length} 项，缺库 ${missing.length} 项，捆绑库 ${bundledChecked} 项（其中从系统加载 ${bundledFromSystem} 项）`);
     } catch (e) {
       logger.warn(`⚠  ldd 检查失败（非 Linux 或权限问题）：${e.message.split('\n')[0]}`);
     }
