@@ -425,6 +425,46 @@ function buildProgram() {
       }
     });
 
+  const nginx = program
+    .command('nginx')
+    .description('NGINX 静态加速：媒体文件走 nginx（端口 9876）减轻设备服务压力，开机自启');
+
+  nginx
+    .command('install')
+    .description('安装并配置 nginx（端口 9876 挂 etc/docroot，preurl 自动改为 IP:9876）')
+    .option('--workdir <path>')
+    .action((opts) => {
+      const mod = require('./nginx');
+      try {
+        process.exitCode = mod.install(resolveWorkdir(opts.workdir));
+      } catch (e) {
+        logger.error(e.message);
+        process.exitCode = 1;
+      }
+    });
+
+  nginx
+    .command('uninstall')
+    .description('卸载 nginx 加速（还原 preurl 到原端口）')
+    .option('--workdir <path>')
+    .action((opts) => {
+      const mod = require('./nginx');
+      try {
+        process.exitCode = mod.uninstall(resolveWorkdir(opts.workdir));
+      } catch (e) {
+        logger.error(e.message);
+        process.exitCode = 1;
+      }
+    });
+
+  nginx
+    .command('status')
+    .description('查看 nginx 运行状态')
+    .action(() => {
+      const mod = require('./nginx');
+      try { process.exitCode = mod.status(); } catch (e) { logger.error(e.message); process.exitCode = 1; }
+    });
+
   program
     .command('uninstall')
     .description('完全卸载：停服务 + 卸载 systemd 服务；加 --purge 删除工作目录（含配置/数据库，不可恢复）')
