@@ -1,7 +1,7 @@
 {
   "name": "adoremix-monorepo",
   "private": true,
-  "version": "1.0.33",
+  "version": "1.0.34",
   "description": "AdoreMix broadcast server - monorepo for npm-packaged cross-platform distribution",
   "workspaces": [
     "workspaces/adoremix",
