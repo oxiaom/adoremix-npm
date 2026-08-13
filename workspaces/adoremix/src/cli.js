@@ -465,6 +465,46 @@ function buildProgram() {
       try { process.exitCode = mod.status(); } catch (e) { logger.error(e.message); process.exitCode = 1; }
     });
 
+  const cfgmgr = program
+    .command('config-manager')
+    .description('设备配置管理 UI（配置 IP / 修改 config.ini / 查看日志），端口 9877，开机自启');
+
+  cfgmgr
+    .command('install')
+    .description('安装设备配置管理 UI（端口 9877，开机自启）')
+    .option('--workdir <path>')
+    .action((opts) => {
+      const mod = require('./config-manager');
+      try {
+        process.exitCode = mod.install(resolveWorkdir(opts.workdir));
+      } catch (e) {
+        logger.error(e.message);
+        process.exitCode = 1;
+      }
+    });
+
+  cfgmgr
+    .command('uninstall')
+    .description('卸载设备配置管理 UI')
+    .option('--workdir <path>')
+    .action((opts) => {
+      const mod = require('./config-manager');
+      try {
+        process.exitCode = mod.uninstall(resolveWorkdir(opts.workdir));
+      } catch (e) {
+        logger.error(e.message);
+        process.exitCode = 1;
+      }
+    });
+
+  cfgmgr
+    .command('status')
+    .description('查看设备配置管理 UI 运行状态')
+    .action(() => {
+      const mod = require('./config-manager');
+      try { process.exitCode = mod.status(); } catch (e) { logger.error(e.message); process.exitCode = 1; }
+    });
+
   program
     .command('uninstall')
     .description('完全卸载：停服务 + 卸载 systemd 服务；加 --purge 删除工作目录（含配置/数据库，不可恢复）')

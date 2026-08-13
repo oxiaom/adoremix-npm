@@ -40,7 +40,8 @@
     "src",
     "templates",
     "tts",
-    "webui"
+    "webui",
+    "config-manager"
   ],
   "keywords": [
     "adoremix",

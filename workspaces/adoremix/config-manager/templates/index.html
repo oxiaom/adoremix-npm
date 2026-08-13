@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>设备配置管理 v1.1</title>
+    <!-- SVG 图标定义 -->
+    <svg style="display: none;">
+      <symbol id="icon-globe" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></symbol>
+      <symbol id="icon-clipboard" viewBox="0 0 24 24"><path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm2 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></symbol>
+      <symbol id="icon-robot" viewBox="0 0 24 24"><path d="M20 9V7c0-1.1-.9-2-2-2h-3c0-1.66-1.34-3-3-3S9 3.34 9 5H6c-1.1 0-2 .9-2 2v2c-1.1 0-2 .9-2 2v6c0 1.1.9 2 2 2h1v-8h2v8h10v-8h2v8h1c1.1 0 2-.9 2-2v-6c0-1.1-.9-2-2-2zM9 13c-.83 0-1.5-.67-1.5-1.5S8.17 10 9 10s1.5.67 1.5 1.5S9.83 13 9 13zm6 0c-.83 0-1.5-.67-1.5-1.5S14.17 10 15 10s1.5.67 1.5 1.5S15.83 13 15 13z"/></symbol>
+      <symbol id="icon-brain" viewBox="0 0 24 24"><path d="M13 3c.65 0 1.26.09 1.83.26.38.11.67.43.71.82.1.9.84 1.59 1.75 1.71.45.06.89.24 1.25.55.63.54.96 1.34.96 2.16 0 .82-.33 1.62-.96 2.16-.36.31-.8.49-1.25.55-.91.12-1.65.81-1.75 1.71-.04.39-.33.71-.71.82-.57.17-1.18.26-1.83.26H11c-1.1 0-2-.9-2-2V5c0-1.1.9-2 2-2h2m0-2H11c-2.21 0-4 1.79-4 4v6c0 2.21 1.79 4 4 4h2c.78 0 1.53-.11 2.24-.31.96-.28 1.72-1.04 1.97-2.01.13-.51.52-.91 1.03-1.04.86-.22 1.62-.71 2.16-1.36C21.1 9.5 21.5 8.54 21.5 7.5c0-1.04-.4-2-.95-2.78-.54-.65-1.3-1.14-2.16-1.36-.51-.13-.9-.53-1.03-1.04-.25-.97-1.01-1.73-1.97-2.01C14.53 1.11 13.78 1 13 1zM15.5 10c.83 0 1.5-.67 1.5-1.5S16.33 7 15.5 7 14 7.67 14 8.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 7 8.5 7 7 7.67 7 8.5 7.67 10 8.5 10zm3.5 4c-2.33 0-4.31 1.46-5.11 3.5h10.22c-.8-2.04-2.78-3.5-5.11-3.5zm-7.11 5.5c.8 2.04 2.78 3.5 5.11 3.5h4c2.33 0 4.31-1.46 5.11-3.5H4.89z"/></symbol>
+      <symbol id="icon-save" viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></symbol>
+      <symbol id="icon-bolt" viewBox="0 0 24 24"><path d="M11 21h-1l1-7H7.5c-.58 0-.57-.32-.38-.66.19-.34.05-.08.07-.12C8.48 10.94 10.42 7.54 13 3h1l-1 7h3.5c.49 0 .56.33.47.51l-.07.15C12.96 17.55 11 21 11 21z"/></symbol>
+      <symbol id="icon-refresh" viewBox="0 0 24 24"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></symbol>
+      <symbol id="icon-check" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></symbol>
+      <symbol id="icon-x" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></symbol>
+      <symbol id="icon-package" viewBox="0 0 24 24"><path d="M20 2H4c-1 0-2 .9-2 2v3.01c0 .72.43 1.34 1 1.69V20c0 1.1 1.1 2 2 2h14c.9 0 2-.9 2-2V8.7c.57-.35 1-.97 1-1.69V4c0-1.1-1-2-2-2zm-5 12H9v-2h6v2zm5-7H4V4h16v3z"/></symbol>
+      <symbol id="icon-location" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></symbol>
+      <symbol id="icon-hash" viewBox="0 0 24 24"><path d="M5 9h14v2H5V9zm0 4h14v2H5v-2zm7-8v14h2V5h-2z"/></symbol>
+      <symbol id="icon-door" viewBox="0 0 24 24"><path d="M19 19V5c0-1.1-.9-2-2-2H7c-1.1 0-2 .9-2 2v14H3v2h18v-2h-2zm-4-7c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1z"/></symbol>
+      <symbol id="icon-settings" viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></symbol>
+      <symbol id="icon-warning" viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></symbol>
+    </svg>
+    <style>
+        /* SVG 图标样式 */
+        .icon {
+            display: inline-block;
+            width: 1em;
+            height: 1em;
+            vertical-align: -0.125em;
+            fill: currentColor;
+        }
+        .icon-globe { fill: #667eea; }
+        .icon-clipboard { fill: #667eea; }
+        .icon-robot { fill: #667eea; }
+        .icon-brain { fill: #667eea; }
+        .icon-save { fill: white; }
+        .icon-bolt { fill: white; }
+        .icon-refresh { fill: white; }
+        .icon-check { fill: #28a745; }
+        .icon-x { fill: #888; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 12px 24px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s;
+        }
+        .tab:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        .tab.active {
+            background: white;
+            color: #667eea;
+            font-weight: 600;
+        }
+        .panel {
+            background: white;
+            border-radius: 0 8px 8px 8px;
+            padding: 30px;
+            display: none;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .panel.active {
+            display: block;
+        }
+        h2 {
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+        input[type="text"],
+        input[type="password"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        button {
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        .btn-secondary {
+            background: #6c757d;
+        }
+        .btn-danger {
+            background: #dc3545;
+        }
+        .btn-danger:hover {
+            box-shadow: 0 5px 15px rgba(220, 53, 69, 0.4);
+        }
+        .message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .message.show {
+            display: block;
+        }
+        .config-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .config-section h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+        }
+        .config-item {
+            display: flex;
+            flex-direction: column;
+        }
+        .config-item label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .config-item input[type="text"] {
+            padding: 8px 12px;
+            font-size: 14px;
+        }
+        .config-item input[type="number"] {
+            padding: 8px 12px;
+            font-size: 14px;
+        }
+        .config-item .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            padding: 8px 0;
+        }
+        .config-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+        .config-item .checkbox-label {
+            margin-left: 8px;
+            font-size: 14px;
+            color: #666;
+        }
+        input.invalid {
+            border-color: #dc3545 !important;
+            background-color: #fff5f5;
+        }
+        .validation-error {
+            color: #dc3545;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        .current-info {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+        .current-info p {
+            margin: 5px 0;
+            color: #333;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        @media (max-width: 768px) {
+            .tabs {
+                flex-wrap: wrap;
+            }
+            .tab {
+                flex: 1;
+                min-width: 100px;
+                text-align: center;
+            }
+            .config-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1><svg class="icon" style="width:32px;height:32px;vertical-align:middle;"><use xlink:href="#icon-settings"/></svg> 设备配置管理</h1>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="showPanel('network')"><svg class="icon"><use xlink:href="#icon-globe"/></svg> 网络配置</button>
+            <button class="tab" onclick="showPanel('config')"><svg class="icon"><use xlink:href="#icon-clipboard"/></svg> 应用配置</button>
+            <button class="tab" onclick="showPanel('logs')">📜 实时日志</button>
+
+        </div>
+        
+        <!-- 网络配置面板 -->
+        <div id="network-panel" class="panel active">
+            <h2>网络配置</h2>
+            <div id="network-message" class="message"></div>
+            
+            <!-- 当前网络状态卡片 -->
+            <div id="network-status-card" style="border-radius: 12px; padding: 20px; margin-bottom: 24px; display: flex; align-items: center; gap: 16px;">
+                <div id="status-icon" style="font-size: 48px;">📡</div>
+                <div style="flex: 1;">
+                    <div id="status-title" style="font-size: 20px; font-weight: 700; margin-bottom: 6px;">正在检测...</div>
+                    <div id="status-detail" style="color: #666; font-size: 14px;">--</div>
+                </div>
+                <div id="mode-badge" style="padding: 8px 18px; border-radius: 20px; font-weight: 700; font-size: 16px; letter-spacing: 1px;">
+                    --
+                </div>
+            </div>
+            
+            <form id="network-form">
+                <div class="form-group">
+                    <label>网络接口</label>
+                    <select id="interface" name="interface" disabled>
+                        <option value="eth0" selected>eth0 (有线网卡)</option>
+                    </select>
+                    <small style="color: #888;">仅支持 eth0 有线网卡</small>
+                </div>
+                <div class="form-group">
+                    <label>IP 地址</label>
+                    <input type="text" id="ip" name="ip" placeholder="192.168.1.100">
+                </div>
+                <div class="form-group">
+                    <label>子网掩码</label>
+                    <select id="netmask" name="netmask">
+                        <option value="8">255.0.0.0 (/8)</option>
+                        <option value="16">255.255.0.0 (/16)</option>
+                        <option value="24" selected>255.255.255.0 (/24)</option>
+                        <option value="25">255.255.255.128 (/25)</option>
+                        <option value="26">255.255.255.192 (/26)</option>
+                        <option value="27">255.255.255.224 (/27)</option>
+                        <option value="28">255.255.255.240 (/28)</option>
+                        <option value="29">255.255.255.248 (/29)</option>
+                        <option value="30">255.255.255.252 (/30)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>网关</label>
+                    <input type="text" id="gateway" name="gateway" placeholder="192.168.1.1">
+                </div>
+                <div class="form-group">
+                    <label>DNS 服务器</label>
+                    <input type="text" id="dns" name="dns" value="8.8.8.8" placeholder="8.8.8.8">
+                </div>
+                <div class="form-group">
+                    <div id="dhcp-row" style="display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-radius: 10px; border: 2px solid #e0e0e0; cursor: pointer; transition: all 0.3s;" onclick="toggleDhcpClick()">
+                        <input type="checkbox" id="use-dhcp" name="use-dhcp" onchange="toggleDhcp(this.checked)" style="width: 22px; height: 22px; cursor: pointer;">
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; font-size: 15px;">使用 DHCP（自动获取 IP 地址）</div>
+                            <small style="color: #888;">勾选后由路由器自动分配 IP，无需手动填写</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="button-group">
+                    <button type="submit"><svg class="icon"><use xlink:href="#icon-save"/></svg> 保存并应用</button>
+                    <button type="button" class="btn-secondary" onclick="loadNetwork()"><svg class="icon"><use xlink:href="#icon-refresh"/></svg> 刷新状态</button>
+                </div>
+            </form>
+            <p style="margin-top: 15px; color: #999; font-size: 14px;">
+                <svg class="icon icon-x" style="width:14px;height:14px;color:#ff9800;"><use xlink:href="#icon-warning"/></svg> 保存后将自动应用网络配置并重启相关服务
+            </p>
+        </div>
+        
+        <!-- 应用配置面板 -->
+        <div id="config-panel" class="panel">
+            <h2>应用配置 (config.ini)</h2>
+            <div id="config-message" class="message"></div>
+            
+            <div id="config-container">
+                <div class="loading">正在加载配置...</div>
+            </div>
+            
+            <div class="button-group">
+                <button onclick="saveConfig()"><svg class="icon"><use xlink:href="#icon-save"/></svg> 保存配置</button>
+                <button class="btn-secondary" onclick="loadConfig()"><svg class="icon"><use xlink:href="#icon-refresh"/></svg> 重新加载</button>
+                <button class="btn-danger" onclick="restartAdoreMix()"><svg class="icon"><use xlink:href="#icon-refresh"/></svg> 重启小播鼠</button>
+            </div>
+        </div>
+        
+        <!-- QQBot 配置面板 -->
+        <div id="qqbot-panel" class="panel">
+            <h2>QQBot 配置</h2>
+            <div id="qqbot-message" class="message"></div>
+
+            <div id="qqbot-status-card" style="border-radius: 12px; padding: 20px; margin-bottom: 24px; display: flex; align-items: center; gap: 16px;">
+                <div id="qqbot-status-icon" style="font-size: 48px;">🤖</div>
+                <div style="flex: 1;">
+                    <div id="qqbot-status-text" style="font-size: 18px; font-weight: 700;">加载中...</div>
+                </div>
+                <button id="qqbot-toggle-btn" class="btn-secondary" onclick="toggleQQBot()" style="padding: 10px 20px;">加载中</button>
+            </div>
+
+            <form id="qqbot-form" style="margin-top: 20px;">
+                <div class="form-group">
+                    <label>QQ 号码 (UIN)</label>
+                    <input type="text" id="qq-uin" name="uin" placeholder="如：123456789">
+                </div>
+                <div class="form-group">
+                    <label>QQ 密码</label>
+                    <input type="password" id="qq-password" name="password" placeholder="请输入密码">
+                </div>
+                <div class="button-group">
+                    <button type="submit"><svg class="icon"><use xlink:href="#icon-save"/></svg> 保存配置</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- 模型配置面板 -->
+        <div id="models-panel" class="panel">
+            <h2>模型配置</h2>
+            <div id="models-message" class="message"></div>
+
+            <div id="models-container">
+                <div class="loading">正在加载配置...</div>
+            </div>
+
+            <div class="button-group" style="margin-top: 20px;">
+                <button onclick="saveModels()"><svg class="icon"><use xlink:href="#icon-save"/></svg> 保存配置</button>
+                <button class="btn-secondary" onclick="loadModels()"><svg class="icon"><use xlink:href="#icon-refresh"/></svg> 重新加载</button>
+            </div>
+        </div>
+
+        <!-- 实时日志面板 -->
+        <div id="logs-panel" class="panel">
+            <h2>实时日志</h2>
+            <div id="logs-message" class="message"></div>
+
+            <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 14px;">
+                <div style="flex: 0 0 220px;">
+                    <label>日志源</label>
+                    <select id="log-service" onchange="restartLogPolling()">
+                        <optgroup label="📡 systemd journal">
+                            <option value="adoremix" selected>adoremix (小播鼠)</option>
+                            <option value="config-manager">config-manager</option>
+                            <option value="openclaw-gateway">openclaw-gateway</option>
+                            <option value="smbd">smbd (Samba)</option>
+                            <option value="nmbd">nmbd (Samba)</option>
+                            <option value="ssh">ssh</option>
+                        </optgroup>
+                        <optgroup label="📁 应用日志文件">
+                            <option value="adoremix-app">adoremix-app (var/app.log)</option>
+                        </optgroup>
+                    </select>
+                </div>
+                <div style="flex: 0 0 130px;">
+                    <label>时间范围</label>
+                    <select id="log-since" onchange="fetchLogs()">
+                        <option value="5min">最近 5 分钟</option>
+                        <option value="10min">最近 10 分钟</option>
+                        <option value="30min">最近 30 分钟</option>
+                        <option value="1h">最近 1 小时</option>
+                        <option value="2h" selected>最近 2 小时</option>
+                        <option value="6h">最近 6 小时</option>
+                        <option value="today">今天</option>
+                        <option value="yesterday">昨天</option>
+                        <option value="all">全部历史</option>
+                    </select>
+                </div>
+                <div style="flex: 0 0 100px;">
+                    <label>行数</label>
+                    <select id="log-lines" onchange="fetchLogs()">
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                        <option value="200" selected>200</option>
+                        <option value="500">500</option>
+                        <option value="1000">1000</option>
+                    </select>
+                </div>
+                <div style="flex: 0 0 110px;">
+                    <label>刷新间隔</label>
+                    <select id="log-interval" onchange="restartLogPolling()">
+                        <option value="1000">1 秒</option>
+                        <option value="2000" selected>2 秒</option>
+                        <option value="5000">5 秒</option>
+                        <option value="10000">10 秒</option>
+                        <option value="0">手动</option>
+                    </select>
+                </div>
+                <div style="flex: 1; min-width: 200px;">
+                    <label>过滤（高亮匹配关键字）</label>
+                    <input type="text" id="log-filter" oninput="renderLogs()" placeholder="如：error、failed、Started…">
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 18px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; padding: 10px 14px; background: #f5f5f5; border-radius: 8px;">
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; margin: 0; font-size: 14px;">
+                    <input type="checkbox" id="log-auto-scroll" checked style="width: 18px; height: 18px; cursor: pointer;">
+                    自动滚动到底部
+                </label>
+                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; margin: 0; font-size: 14px;">
+                    <input type="checkbox" id="log-auto-refresh" checked onchange="restartLogPolling()" style="width: 18px; height: 18px; cursor: pointer;">
+                    自动刷新
+                </label>
+                <span id="log-status" style="color: #888; font-size: 13px; margin-left: auto;">就绪</span>
+            </div>
+
+            <div id="log-output" style="background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 8px; font-family: 'Consolas', 'Monaco', 'Courier New', monospace; font-size: 13px; line-height: 1.55; height: 480px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; box-shadow: inset 0 2px 6px rgba(0,0,0,0.2);">
+                <div style="color: #888;">加载中...</div>
+            </div>
+
+            <div class="button-group" style="margin-top: 16px;">
+                <button onclick="fetchLogs()"><svg class="icon"><use xlink:href="#icon-refresh"/></svg> 立即刷新</button>
+                <button class="btn-secondary" onclick="copyLogs()">📋 复制到剪贴板</button>
+                <button class="btn-secondary" onclick="downloadLogs()">💾 下载日志</button>
+                <button class="btn-danger" onclick="clearLogDisplay()">🗑️ 清空显示</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 切换面板
+        function showPanel(name) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+
+            event.target.classList.add('active');
+            document.getElementById(name + '-panel').classList.add('active');
+
+            // 离开日志面板时停掉轮询，避免后台耗资源
+            if (name !== 'logs' && logPollingTimer) {
+                clearInterval(logPollingTimer);
+                logPollingTimer = null;
+            }
+
+            // 加载数据
+            if (name === 'network') loadNetwork();
+            if (name === 'config') loadConfig();
+            if (name === 'qqbot') loadQQBot();
+            if (name === 'models') loadModels();
+            if (name === 'logs') restartLogPolling();
+        }
+        
+        // 显示消息
+        function showMessage(panelId, type, text) {
+            const msg = document.getElementById(panelId + '-message');
+            msg.className = 'message ' + type + ' show';
+            msg.textContent = text;
+            setTimeout(() => msg.classList.remove('show'), 5000);
+        }
+        
+        // 加载网络配置
+        // 点击 DHCP 行切换
+        function toggleDhcpClick() {
+            const cb = document.getElementById('use-dhcp');
+            cb.checked = !cb.checked;
+            toggleDhcp(cb.checked);
+        }
+
+        // 切换 DHCP 模式
+        function toggleDhcp(enabled) {
+            const ipInput = document.getElementById('ip');
+            const netmaskSelect = document.getElementById('netmask');
+            const gatewayInput = document.getElementById('gateway');
+            const dnsInput = document.getElementById('dns');
+            const dhcpRow = document.getElementById('dhcp-row');
+            
+            if (enabled) {
+                ipInput.disabled = true;
+                netmaskSelect.disabled = true;
+                gatewayInput.disabled = true;
+                dnsInput.disabled = true;
+                ipInput.style.backgroundColor = '#f0f0f0';
+                netmaskSelect.style.backgroundColor = '#f0f0f0';
+                gatewayInput.style.backgroundColor = '#f0f0f0';
+                dnsInput.style.backgroundColor = '#f0f0f0';
+                dhcpRow.style.borderColor = '#28a745';
+                dhcpRow.style.background = '#f0fdf4';
+            } else {
+                ipInput.disabled = false;
+                netmaskSelect.disabled = false;
+                gatewayInput.disabled = false;
+                dnsInput.disabled = false;
+                ipInput.style.backgroundColor = '';
+                netmaskSelect.style.backgroundColor = '';
+                gatewayInput.style.backgroundColor = '';
+                dnsInput.style.backgroundColor = '';
+                dhcpRow.style.borderColor = '#e0e0e0';
+                dhcpRow.style.background = '';
+            }
+        }
+        
+        // 加载网络配置
+        async function loadNetwork() {
+            try {
+                const res = await fetch('/api/network');
+                const data = await res.json();
+                
+                const card = document.getElementById('network-status-card');
+                const statusIcon = document.getElementById('status-icon');
+                const statusTitle = document.getElementById('status-title');
+                const statusDetail = document.getElementById('status-detail');
+                const modeBadge = document.getElementById('mode-badge');
+                
+                if (data.interfaces && data.interfaces.length > 0) {
+                    const eth0 = data.interfaces.find(i => i.name === 'eth0');
+                    
+                    if (eth0) {
+                        const ip = eth0.ip || '未获取';
+                        const gw = eth0.gateway || '未知';
+                        const isDhcp = eth0.dhcp;
+                        
+                        statusIcon.textContent = ip !== '未获取' ? '🌐' : '📡';
+                        statusTitle.textContent = 'eth0 - 有线网卡已连接';
+                        
+                        const cidrToMask = {
+                            '8': '255.0.0.0', '16': '255.255.0.0', '24': '255.255.255.0',
+                            '25': '255.255.255.128', '26': '255.255.255.192', '27': '255.255.255.224',
+                            '28': '255.255.255.240', '29': '255.255.255.248', '30': '255.255.255.252'
+                        };
+                        const maskDisplay = cidrToMask[eth0.netmask] || eth0.netmask;
+                        statusDetail.textContent = 'IP: ' + ip + ' | 掩码: ' + maskDisplay + ' | 网关: ' + gw;
+                        
+                        if (isDhcp) {
+                            card.style.background = 'linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%)';
+                            card.style.border = '2px solid #28a745';
+                            modeBadge.textContent = '🔄 DHCP 动态';
+                            modeBadge.style.background = '#28a745';
+                            modeBadge.style.color = 'white';
+                        } else {
+                            card.style.background = 'linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%)';
+                            card.style.border = '2px solid #ffc107';
+                            modeBadge.textContent = '📌 静态 IP';
+                            modeBadge.style.background = '#e6a800';
+                            modeBadge.style.color = 'white';
+                        }
+                        
+                        document.getElementById('ip').value = eth0.ip || '';
+                        const netmaskSelect = document.getElementById('netmask');
+                        for (let i = 0; i < netmaskSelect.options.length; i++) {
+                            if (netmaskSelect.options[i].value === (eth0.netmask || '24')) {
+                                netmaskSelect.selectedIndex = i;
+                                break;
+                            }
+                        }
+                        document.getElementById('gateway').value = eth0.gateway || '';
+                        document.getElementById('use-dhcp').checked = isDhcp || false;
+                        toggleDhcp(isDhcp || false);
+                    } else {
+                        statusIcon.textContent = '⚠️';
+                        statusTitle.textContent = 'eth0 未找到';
+                        statusDetail.textContent = '请检查有线网卡连接';
+                        card.style.background = '#f8d7da';
+                        card.style.border = '2px solid #dc3545';
+                        modeBadge.textContent = '❌ 未连接';
+                        modeBadge.style.background = '#dc3545';
+                        modeBadge.style.color = 'white';
+                    }
+                } else {
+                    statusIcon.textContent = '❌';
+                    statusTitle.textContent = '未检测到网络接口';
+                    statusDetail.textContent = '--';
+                    card.style.background = '#f8d7da';
+                    card.style.border = '2px solid #dc3545';
+                    modeBadge.textContent = '错误';
+                    modeBadge.style.background = '#dc3545';
+                    modeBadge.style.color = 'white';
+                }
+            } catch (e) {
+                showMessage('network', 'error', '加载网络信息失败: ' + e.message);
+            }
+        }
+        
+        // 保存网络配置（保存并立即应用）
+        document.getElementById('network-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!confirm('保存将立即应用网络配置并重启相关服务，可能导致连接中断！确定继续？')) return;
+            
+            const useDhcp = document.getElementById('use-dhcp').checked;
+            
+            const data = {
+                interface: 'eth0',
+                ip: document.getElementById('ip').value,
+                netmask: document.getElementById('netmask').value,
+                gateway: document.getElementById('gateway').value,
+                dns: document.getElementById('dns').value,
+                useDhcp: useDhcp,
+                applyNow: true
+            };
+            
+            try {
+                const res = await fetch('/api/network', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                const result = await res.json();
+                
+                if (result.success) {
+                    showMessage('network', 'success', result.message);
+                } else {
+                    showMessage('network', 'error', result.error);
+                }
+            } catch (e) {
+                showMessage('network', 'error', '保存失败: ' + e.message);
+            }
+        });
+        
+        // 加载应用配置
+        async function loadConfig() {
+            const container = document.getElementById('config-container');
+            container.innerHTML = '<div class="loading">正在加载配置...</div>';
+            
+            try {
+                const res = await fetch('/api/config');
+                const data = await res.json();
+                
+                if (data.config) {
+                    let html = '';
+                    for (const [section, values] of Object.entries(data.config)) {
+                        html += `<div class="config-section">
+                            <h3>[${section}]</h3>
+                            <div class="config-grid">`;
+                        
+                        for (const [key, value] of Object.entries(values)) {
+                            const inputHtml = generateInputHtml(section, key, value);
+                            html += `
+                                <div class="config-item">
+                                    <label>${key}</label>
+                                    ${inputHtml}
+                                </div>`;
+                        }
+                        
+                        html += `</div></div>`;
+                    }
+                    container.innerHTML = html;
+                }
+            } catch (e) {
+                showMessage('config', 'error', '加载配置失败: ' + e.message);
+            }
+        }
+        
+        // 根据值类型生成对应的输入控件
+        function generateInputHtml(section, key, value) {
+            const strValue = value || '';
+            
+            // 布尔值 -> 复选框
+            if (strValue.toLowerCase() === 'true' || strValue.toLowerCase() === 'false') {
+                const checked = strValue.toLowerCase() === 'true' ? 'checked' : '';
+                return `<div class="checkbox-wrapper">
+                    <input type="checkbox" 
+                           data-section="${section}" 
+                           data-key="${key}" 
+                           data-type="boolean"
+                           ${checked}
+                           onchange="this.nextElementSibling.textContent = this.checked">
+                    <span class="checkbox-label">${strValue.toLowerCase() === 'true' ? 'true' : 'false'}</span>
+                </div>`;
+            }
+            
+            // 端口号 -> 数字输入框 + 验证
+            if (key.toLowerCase().includes('port') || key.toLowerCase().endsWith('port')) {
+                return `<input type="number" 
+                               data-section="${section}" 
+                               data-key="${key}" 
+                               data-type="port"
+                               value="${strValue}"
+                               min="1" 
+                               max="65535"
+                               oninput="validatePort(this)">`;
+            }
+            
+            // IP 地址 -> 文本框 + 验证
+            if (/^(ip|bindip|listenip|serverip|remoteip|localip|hostip)$/i.test(key)) {
+                return `<input type="text" 
+                               data-section="${section}" 
+                               data-key="${key}" 
+                               data-type="ip"
+                               value="${strValue}"
+                               oninput="validateIp(this)"
+                               placeholder="例如: 192.168.1.1">`;
+            }
+            
+            // 纯数字 -> 数字输入框
+            if (/^\d+$/.test(strValue) && strValue !== '') {
+                return `<input type="number" 
+                               data-section="${section}" 
+                               data-key="${key}" 
+                               data-type="number"
+                               value="${strValue}"
+                               oninput="validateNumber(this)">`;
+            }
+            
+            // 默认 -> 文本框
+            return `<input type="text" 
+                           data-section="${section}" 
+                           data-key="${key}" 
+                           data-type="text"
+                           value="${strValue}">`;
+        }
+        
+        // 验证端口号
+        function validatePort(input) {
+            const value = parseInt(input.value);
+            const isValid = value >= 1 && value <= 65535;
+            
+            input.classList.toggle('invalid', !isValid);
+            
+            let errorMsg = input.nextElementSibling;
+            if (!isValid && input.value !== '') {
+                if (!errorMsg || !errorMsg.classList.contains('validation-error')) {
+                    errorMsg = document.createElement('div');
+                    errorMsg.className = 'validation-error';
+                    errorMsg.textContent = '端口范围: 1-65535';
+                    input.parentNode.insertBefore(errorMsg, input.nextSibling);
+                }
+            } else if (errorMsg && errorMsg.classList.contains('validation-error')) {
+                errorMsg.remove();
+            }
+            
+            return isValid;
+        }
+        
+        // 验证 IP 地址
+        function validateIp(input) {
+            const value = input.value.trim();
+            
+            // 允许空值
+            if (value === '') {
+                input.classList.remove('invalid');
+                removeValidationError(input);
+                return true;
+            }
+            
+            // IP 正则: x.x.x.x 格式，每个段 0-255
+            const ipRegex = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+            const match = value.match(ipRegex);
+            
+            let isValid = false;
+            if (match) {
+                const nums = [match[1], match[2], match[3], match[4]].map(Number);
+                isValid = nums.every(n => n >= 0 && n <= 255);
+            }
+            
+            input.classList.toggle('invalid', !isValid);
+            
+            let errorMsg = input.nextElementSibling;
+            if (!isValid) {
+                if (!errorMsg || !errorMsg.classList.contains('validation-error')) {
+                    errorMsg = document.createElement('div');
+                    errorMsg.className = 'validation-error';
+                    errorMsg.textContent = 'IP 格式无效 (例如: 192.168.1.1)';
+                    input.parentNode.insertBefore(errorMsg, input.nextSibling);
+                }
+            } else if (errorMsg && errorMsg.classList.contains('validation-error')) {
+                errorMsg.remove();
+            }
+            
+            return isValid;
+        }
+        
+        // 验证纯数字
+        function validateNumber(input) {
+            const isValid = /^\d*$/.test(input.value);
+            input.classList.toggle('invalid', !isValid);
+            
+            let errorMsg = input.nextElementSibling;
+            if (!isValid) {
+                if (!errorMsg || !errorMsg.classList.contains('validation-error')) {
+                    errorMsg = document.createElement('div');
+                    errorMsg.className = 'validation-error';
+                    errorMsg.textContent = '只能输入数字';
+                    input.parentNode.insertBefore(errorMsg, input.nextSibling);
+                }
+            } else if (errorMsg && errorMsg.classList.contains('validation-error')) {
+                errorMsg.remove();
+            }
+            
+            return isValid;
+        }
+        
+        // 移除验证错误提示
+        function removeValidationError(input) {
+            const errorMsg = input.nextElementSibling;
+            if (errorMsg && errorMsg.classList.contains('validation-error')) {
+                errorMsg.remove();
+            }
+        }
+        
+        // 保存应用配置
+        async function saveConfig() {
+            const inputs = document.querySelectorAll('#config-container input[data-section]');
+            const config = {};
+            let hasErrors = false;
+            
+            inputs.forEach(input => {
+                const section = input.dataset.section;
+                const key = input.dataset.key;
+                const type = input.dataset.type;
+                
+                if (!config[section]) config[section] = {};
+                
+                let value;
+                
+                if (type === 'boolean') {
+                    // 复选框 -> true/false
+                    value = input.checked ? 'true' : 'false';
+                } else if (type === 'port') {
+                    // 验证端口
+                    if (!validatePort(input)) {
+                        hasErrors = true;
+                        return;
+                    }
+                    value = input.value;
+                } else if (type === 'ip') {
+                    // 验证 IP
+                    if (!validateIp(input)) {
+                        hasErrors = true;
+                        return;
+                    }
+                    value = input.value.trim();
+                } else if (type === 'number') {
+                    // 验证数字
+                    if (!validateNumber(input)) {
+                        hasErrors = true;
+                        return;
+                    }
+                    value = input.value;
+                } else {
+                    value = input.value;
+                }
+                
+                config[section][key] = value;
+            });
+            
+            if (hasErrors) {
+                showMessage('config', 'error', '请修正输入错误后再保存');
+                return;
+            }
+            
+            try {
+                const res = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({config})
+                });
+                const result = await res.json();
+                
+                if (result.success) {
+                    showMessage('config', 'success', result.message);
+                } else {
+                    showMessage('config', 'error', result.error);
+                }
+            } catch (e) {
+                showMessage('config', 'error', '保存失败: ' + e.message);
+            }
+        }
+        
+        // 加载 QQBot 配置
+        // QQBot 当前启用状态
+        let qqbotEnabled = true;
+
+        async function loadQQBot() {
+            try {
+                const res = await fetch('/api/qqbot');
+                const data = await res.json();
+                
+                if (data.config) {
+                    document.getElementById('qq-uin').value = data.config.uin || '';
+                    document.getElementById('qq-password').value = data.config.password || '';
+                    qqbotEnabled = data.config.enabled !== false;
+                }
+                updateQQBotUI();
+            } catch (e) {
+                showMessage('qqbot', 'error', '加载配置失败: ' + e.message);
+            }
+        }
+
+        function updateQQBotUI() {
+            const card = document.getElementById('qqbot-status-card');
+            const icon = document.getElementById('qqbot-status-icon');
+            const text = document.getElementById('qqbot-status-text');
+            const btn = document.getElementById('qqbot-toggle-btn');
+
+            if (qqbotEnabled) {
+                card.style.background = 'linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%)';
+                card.style.border = '2px solid #28a745';
+                icon.textContent = '🟢';
+                text.textContent = 'QQBot 已启用，正在运行中';
+                btn.textContent = '🔴 禁用 QQBot';
+                btn.style.background = '#dc3545';
+                btn.style.color = 'white';
+            } else {
+                card.style.background = 'linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%)';
+                card.style.border = '2px solid #dc3545';
+                icon.textContent = '🔴';
+                text.textContent = 'QQBot 已禁用';
+                btn.textContent = '🟢 启用 QQBot';
+                btn.style.background = '#28a745';
+                btn.style.color = 'white';
+            }
+        }
+
+        async function toggleQQBot() {
+            const newState = !qqbotEnabled;
+            const action = newState ? '启用' : '禁用';
+            if (!confirm('确定要' + action + ' QQBot 吗？需要重启 Gateway 才能生效。')) return;
+
+            try {
+                const res = await fetch('/api/qqbot-toggle', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({enabled: newState})
+                });
+                const result = await res.json();
+                if (result.success) {
+                    qqbotEnabled = newState;
+                    updateQQBotUI();
+                    showMessage('qqbot', 'success', result.message);
+                } else {
+                    showMessage('qqbot', 'error', result.error);
+                }
+            } catch (e) {
+                showMessage('qqbot', 'error', action + '失败: ' + e.message);
+            }
+        }
+        
+        // 保存 QQBot 配置
+        document.getElementById('qqbot-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const data = {
+                uin: document.getElementById('qq-uin').value,
+                password: document.getElementById('qq-password').value
+            };
+            
+            try {
+                const res = await fetch('/api/qqbot', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                const result = await res.json();
+                
+                if (result.success) {
+                    showMessage('qqbot', 'success', result.message);
+                } else {
+                    showMessage('qqbot', 'error', result.error);
+                }
+            } catch (e) {
+                showMessage('qqbot', 'error', '保存失败: ' + e.message);
+            }
+        });
+        
+        // 重启小播鼠服务
+        async function restartAdoreMix() {
+            if (!confirm('确定要重启小播鼠服务吗？')) return;
+            
+            try {
+                const res = await fetch('/api/adoremix-restart', {method: 'POST'});
+                const result = await res.json();
+                
+                if (result.success) {
+                    showMessage('config', 'success', result.message);
+                } else {
+                    showMessage('config', 'error', result.error || '重启失败');
+                }
+            } catch (e) {
+                showMessage('config', 'error', '重启失败: ' + e.message);
+            }
+        }
+        
+        // 重启 OpenClaw Gateway
+        async function restartOpenClaw() {
+            if (!confirm('确定要重启 OpenClaw Gateway 吗？')) return;
+            
+            try {
+                const res = await fetch('/api/openclaw-restart', {method: 'POST'});
+                const result = await res.json();
+                
+                if (result.success) {
+                    showMessage('qqbot', 'success', result.message);
+                    showMessage('models', 'success', result.message);
+                } else {
+                    showMessage('qqbot', 'error', result.error);
+                    showMessage('models', 'error', result.error);
+                }
+            } catch (e) {
+                showMessage('qqbot', 'error', '重启失败: ' + e.message);
+                showMessage('models', 'error', '重启失败: ' + e.message);
+            }
+        }
+        
+        // 页面加载时初始化
+        loadNetwork();
+        
+        // 提供商配置映射
+        const providerConfig = {
+            'openai': { keyModel: 'openai/gpt-4o', defaultUrl: 'https://api.openai.com/v1' },
+            'anthropic': { keyModel: 'anthropic/claude-3-5-sonnet', defaultUrl: 'https://api.anthropic.com' },
+            'google': { keyModel: 'google/gemini-1.5-pro', defaultUrl: 'https://generativelanguage.googleapis.com' },
+            'zhipu': { keyModel: 'zai/glm-4', defaultUrl: 'https://open.bigmodel.cn/api/paas/v4' },
+            'deepseek': { keyModel: 'deepseek/deepseek-chat', defaultUrl: 'https://api.deepseek.com' },
+            'moonshot': { keyModel: 'moonshot/moonshot-v1-8k', defaultUrl: 'https://api.moonshot.cn/v1' },
+            'qwen': { keyModel: 'qwen/qwen-turbo', defaultUrl: 'https://dashscope.aliyuncs.com/api/v1' },
+            'ollama': { keyModel: 'ollama/llama3', defaultUrl: 'http://localhost:11434' }
+        };
+        
+        // 提供商前缀映射
+        const providerKeyMap = {
+            'openai': ['openai/', 'gpt-', 'o1-'],
+            'anthropic': ['anthropic/', 'claude-'],
+            'google': ['google/', 'gemini-'],
+            'zhipu': ['zai/', 'glm-'],
+            'deepseek': ['deepseek/'],
+            'moonshot': ['moonshot/', 'kimi-'],
+            'qwen': ['qwen/', 'tongyi-'],
+            'ollama': ['ollama/']
+        };
+        
+        // 加载模型配置
+        async function loadModels() {
+            try {
+                const res = await fetch('/api/models');
+                const data = await res.json();
+                
+                // 填充模型选择
+                const select = document.getElementById('primary-model');
+                select.innerHTML = '';
+                
+                const providers = {};
+                data.availableModels.forEach(model => {
+                    if (!providers[model.provider]) {
+                        providers[model.provider] = [];
+                    }
+                    providers[model.provider].push(model);
+                });
+                
+                for (const [provider, models] of Object.entries(providers)) {
+                    const group = document.createElement('optgroup');
+                    group.label = provider.toUpperCase();
+                    
+                    models.forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model.id;
+                        // 标注当前模型
+                        if (model.id === data.primary) {
+                            option.textContent = model.name + ' ✓ 当前';
+                            option.selected = true;
+                        } else {
+                            option.textContent = model.name;
+                        }
+                        group.appendChild(option);
+                    });
+                    
+                    select.appendChild(group);
+                }
+                
+                // 添加自定义选项
+                const customOption = document.createElement('option');
+                customOption.value = '__custom__';
+                customOption.textContent = '自定义模型 ID...';
+                select.appendChild(customOption);
+                
+                // 如果当前模型不在列表中，添加为自定义
+                if (data.primary && !data.availableModels.find(m => m.id === data.primary)) {
+                    const customGroup = document.createElement('optgroup');
+                    customGroup.label = '当前';
+                    const currentOption = document.createElement('option');
+                    currentOption.value = data.primary;
+                    currentOption.textContent = data.primary + ' (当前)';
+                    currentOption.selected = true;
+                    customGroup.appendChild(currentOption);
+                    select.insertBefore(customGroup, select.firstChild);
+                }
+                
+                // 填充 API keys 和 URLs
+                if (data.models) {
+                    for (const [modelId, cfg] of Object.entries(data.models)) {
+                        if (!cfg) continue;
+                        
+                        // 根据模型 ID 判断提供商
+                        for (const [provider, prefixes] of Object.entries(providerKeyMap)) {
+                            if (prefixes.some(p => modelId.startsWith(p) || modelId.includes(p))) {
+                                // API Key
+                                if (cfg.apiKey) {
+                                    const keyInput = document.getElementById(provider + '-key');
+                                    if (keyInput) {
+                                        keyInput.value = cfg.apiKey;
+                                    }
+                                }
+                                // Base URL
+                                if (cfg.baseUrl) {
+                                    const urlInput = document.getElementById(provider + '-url');
+                                    if (urlInput) {
+                                        urlInput.value = cfg.baseUrl;
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+            } catch (e) {
+                showMessage('models', 'error', '加载模型配置失败: ' + e.message);
+            }
+        }
+        
+        // 保存模型配置
+        async function saveModels() {
+            const primary = document.getElementById('primary-model').value;
+            
+            if (!primary || primary === '__custom__') {
+                showMessage('models', 'error', '请选择一个有效的模型');
+                return;
+            }
+            
+            // 收集配置
+            const modelConfigs = {};
+            
+            for (const [provider, config] of Object.entries(providerConfig)) {
+                const keyInput = document.getElementById(provider + '-key');
+                const urlInput = document.getElementById(provider + '-url');
+                
+                const apiKey = keyInput ? keyInput.value.trim() : '';
+                const baseUrl = urlInput ? urlInput.value.trim() : '';
+                
+                if (apiKey || baseUrl) {
+                    modelConfigs[config.keyModel] = {};
+                    if (apiKey) {
+                        modelConfigs[config.keyModel].apiKey = apiKey;
+                    }
+                    if (baseUrl) {
+                        modelConfigs[config.keyModel].baseUrl = baseUrl;
+                    }
+                }
+            }
+            
+            try {
+                const res = await fetch('/api/models', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        primary: primary,
+                        modelConfigs: modelConfigs
+                    })
+                });
+                const result = await res.json();
+                
+                if (result.success) {
+                    showMessage('models', 'success', result.message);
+                } else {
+                    showMessage('models', 'error', result.error);
+                }
+            } catch (e) {
+                showMessage('models', 'error', '保存失败: ' + e.message);
+            }
+        }
+
+        // ==================== 实时日志 ====================
+        let logPollingTimer = null;
+        let lastLogLines = [];
+        let lastLogService = '';
+
+        function escapeHtml(s) {
+            return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function colorizeLogLine(line) {
+            const lower = line.toLowerCase();
+            if (/(error|failed|exit code|exit er|er[0-9]\b)/i.test(line)) {
+                return '#f48771';
+            } else if (/(warning|warn|deprecated)/i.test(line)) {
+                return '#dcdcaa';
+            } else if (/(started|success|completed|loaded|active|listening|connected)/i.test(lower)) {
+                return '#4ec9b0';
+            } else if (/(stopped|deactivated|inactive|dead|disconnected)/i.test(lower)) {
+                return '#9cdcfe';
+            }
+            return '#d4d4d4';
+        }
+
+        async function fetchLogs() {
+            const service = document.getElementById('log-service').value;
+            const lines = document.getElementById('log-lines').value;
+            const since = document.getElementById('log-since').value;
+            const status = document.getElementById('log-status');
+
+            if (lastLogService && lastLogService !== service) {
+                lastLogLines = [];
+                document.getElementById('log-output').innerHTML = '<div style="color: #888;">加载中...</div>';
+            }
+            lastLogService = service;
+
+            status.textContent = '⏳ 加载中…';
+            status.style.color = '#667eea';
+
+            try {
+                const res = await fetch(`/api/logs?service=${encodeURIComponent(service)}&lines=${lines}&since=${encodeURIComponent(since)}`);
+                const data = await res.json();
+
+                if (data.error) {
+                    status.textContent = '❌ ' + data.error;
+                    status.style.color = '#dc3545';
+                    showMessage('logs', 'error', data.error);
+                    return;
+                }
+
+                lastLogLines = data.lines || [];
+                renderLogs();
+
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString('zh-CN', { hour12: false });
+                const sinceLabel = document.querySelector('#log-since option:checked').textContent;
+                const sourceTag = data.source === 'file' ? `📁 ${data.path || ''}` : '📡 journalctl';
+                status.textContent = `✅ ${data.count} 行 · ${sinceLabel} · ${sourceTag} · 更新于 ${timeStr}`;
+                status.style.color = '#28a745';
+                if (data.warning) {
+                    showMessage('logs', 'error', data.warning);
+                }
+            } catch (e) {
+                status.textContent = '❌ ' + e.message;
+                status.style.color = '#dc3545';
+            }
+        }
+
+        function renderLogs() {
+            const output = document.getElementById('log-output');
+            const filter = document.getElementById('log-filter').value;
+            const autoScroll = document.getElementById('log-auto-scroll').checked;
+
+            const wasAtBottom = output.scrollTop + output.clientHeight >= output.scrollHeight - 20;
+
+            let html = '';
+            if (lastLogLines.length === 0) {
+                html = '<div style="color: #888;">（暂无日志）</div>';
+            } else {
+                const filterLower = filter.toLowerCase();
+                const filterEscaped = filter.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const re = filter ? new RegExp(filterEscaped, 'gi') : null;
+                let visible = 0;
+
+                for (const line of lastLogLines) {
+                    if (filter && !line.toLowerCase().includes(filterLower)) continue;
+                    visible++;
+                    const color = colorizeLogLine(line);
+                    let display = escapeHtml(line);
+                    if (re) {
+                        display = display.replace(re, m => `<mark style="background:#ffc107;color:#000;padding:0 2px;border-radius:2px;">${m}</mark>`);
+                    }
+                    html += `<div style="color: ${color};">${display}</div>`;
+                }
+                if (visible === 0) {
+                    html = '<div style="color: #888;">（无匹配 “' + escapeHtml(filter) + '” 的日志行）</div>';
+                }
+            }
+
+            output.innerHTML = html;
+            if (autoScroll || wasAtBottom) {
+                output.scrollTop = output.scrollHeight;
+            }
+        }
+
+        function restartLogPolling() {
+            if (logPollingTimer) {
+                clearInterval(logPollingTimer);
+                logPollingTimer = null;
+            }
+            const autoRefresh = document.getElementById('log-auto-refresh');
+            const interval = parseInt(document.getElementById('log-interval').value);
+            if (autoRefresh.checked && interval > 0) {
+                logPollingTimer = setInterval(fetchLogs, interval);
+            }
+            fetchLogs();
+        }
+
+        function copyLogs() {
+            const text = lastLogLines.join('\n');
+            if (!text) { showMessage('logs', 'error', '没有可复制的日志'); return; }
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showMessage('logs', 'success', `已复制 ${lastLogLines.length} 行到剪贴板`);
+                }).catch(e => showMessage('logs', 'error', '复制失败: ' + e.message));
+            } else {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                try { document.execCommand('copy'); showMessage('logs', 'success', `已复制 ${lastLogLines.length} 行`); }
+                catch (e) { showMessage('logs', 'error', '复制失败: ' + e.message); }
+                document.body.removeChild(ta);
+            }
+        }
+
+        function downloadLogs() {
+            const text = lastLogLines.join('\n');
+            if (!text) { showMessage('logs', 'error', '没有可下载的日志'); return; }
+            const service = document.getElementById('log-service').value;
+            const ts = new Date().toISOString().replace(/[:.]/g, '-');
+            const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${service}-${ts}.log`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function clearLogDisplay() {
+            if (!confirm('清空当前显示的日志（不影响服务器上的真实日志）？')) return;
+            lastLogLines = [];
+            renderLogs();
+            const status = document.getElementById('log-status');
+            status.textContent = '已清空显示';
+            status.style.color = '#888';
+        }
+    </script>
+</body>
+</html>
