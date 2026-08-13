@@ -1,20 +1,21 @@
 # syntax=docker/dockerfile:1.4
 #
-# Linux x64 AdoreMix 低 glibc 构建工具链（Phase 2）：
-#   基镜像 AlmaLinux 8（glibc 2.28，gcc 8.5）。
-#   Qt 5.15.2 官方 gcc_64 通过 docker run -v 挂载（自带 ICU56，glibc 基线 2.17）。
-#   编译在 docker run 里执行（见 build-linux-x64-glibc228.sh）。
-#
-# 注意：Qt 官方 Linux 二进制仅有 x86_64（gcc_64），无 arm64/arm。
+# Linux x64 AdoreMix 低 glibc 构建（Phase 2）：
+#   基镜像 AlmaLinux 8（glibc 2.28，gcc 8.5）+ Qt 5.15.2 官方 gcc_64（glibc 2.17，自带 ICU56）。
+#   用 BuildKit 命名上下文避免大 build context：
+#     docker build --build-context src=/path/to/Adore_mix2 --build-context qt=/path/to/gcc_64 -f Dockerfile.linux-x64-glibc228 .
+#   仅 x86_64（Qt 官方无 arm64/arm 二进制）。
 
 FROM almalinux:8
 
-ARG DEBIAN_FRONTEND=noninteractive
+ARG ADORE_VERSION=8.0.17
+ARG TARGET_BIN=AdoreMixV8.0.17_console_linuxx64
+ARG QT_ROOT=/opt/qt
 
-# 阿里云镜像（AlmaLinux 8 官方 mirrorlist 国内访问慢）
+# 阿里云镜像
 RUN sed -i -e 's|^mirrorlist=|#mirrorlist=|g' -e 's|^# *baseurl=https://repo.almalinux.org|baseurl=https://mirrors.aliyun.com|g' /etc/yum.repos.d/almalinux.repo
 
-# EPEL（阿里云）
+# EPEL
 RUN dnf install -y epel-release && \
     cat > /etc/yum.repos.d/epel.repo <<'EOF'
 [epel]
@@ -24,12 +25,118 @@ enabled=1
 gpgcheck=0
 EOF
 
-# 工具链 + 第三方库（glibc 2.28 基线）
+# 工具链 + 第三方库
 RUN dnf install -y --setopt=tsflags=nodocs \
         gcc-c++ make \
+        mesa-libGL-devel \
+        pulseaudio-libs-devel \
+        libX11 libXext libxcb libICE libSM libXtst libsndfile libasyncns \
+        libXau libXi gsm flac-libs libogg libvorbis \
         sqlite-devel openssl-devel glib2-devel pcre-devel zlib-devel \
         hiredis-devel opus-devel opusfile-devel mariadb-devel \
         patchelf file wget git which \
     && dnf clean all
 
-CMD ["/bin/bash"]
+# Qt 5.15.2 gcc_64（命名上下文 qt）
+COPY --from=qt / /opt/qt/
+
+# 源码（命名上下文 src）
+COPY --from=src / /src/
+WORKDIR /src
+
+# 0) 清理旧编译残留
+RUN find /src \( \
+        -name '.qmake.stash' -o -name '*.pro.user' -o -name '*.pro.user.*' -o \
+        -name 'Makefile' -o -name 'Makefile.Debug' -o -name 'Makefile.Release' -o \
+        -name '.moc' -o -name '.uic' -o -name '.rcc' -o -name '.obj' -o \
+        -name 'mkspecs' -o -name 'build-*' -o -name 'debug' -o -name 'release' -o \
+        -name '*.o' -o -name '*.obj' -o -name '*.a' -o \
+        -name 'libsqlitecipher.so' -o -name 'libsqlitecipher.so.*' \
+    \) -prune -exec rm -rf {} + 2>/dev/null ; echo "=== /src 清理完成 ==="
+
+# 0.5) 修复大小写敏感
+RUN find /src -type f \( -name '*.h' -o -name '*.cpp' -o -name '*.hpp' \) | while read f; do \
+        dir=$(dirname "$f"); base=$(basename "$f"); lower=$(echo "$base" | tr 'A-Z' 'a-z'); \
+        if [ "$base" != "$lower" ] && [ ! -e "$dir/$lower" ]; then ln -s "$base" "$dir/$lower"; fi; \
+    done ; echo "=== 大小写链接完成 ==="
+
+# 1) 编译 QtCipherSqlitePlugin
+RUN export PATH=${QT_ROOT}/bin:$PATH && \
+    SUBDIR=$(ls -d QtCipherSqlitePlugin-develop/QtCipherSqlitePlugin-develop 2>/dev/null || echo QtCipherSqlitePlugin-develop) && \
+    if [ -d "$SUBDIR" ] && [ -f "$SUBDIR/QtCipherSqlitePlugin.pro" ]; then \
+        find "$SUBDIR" -name 'Makefile*' -delete ; \
+        cd "$SUBDIR/sqlitecipher" && \
+        ${QT_ROOT}/bin/qmake sqlitecipher.pro && make -j$(nproc) && \
+        SO_PATH=$(find . -name 'libsqlitecipher.so' | head -1) && \
+        cp "$SO_PATH" /usr/lib64/ && chmod 0755 /usr/lib64/libsqlitecipher.so && ldconfig && \
+        QT_PLUGINS=$(${QT_ROOT}/bin/qmake -query QT_INSTALL_PLUGINS) && \
+        mkdir -p $QT_PLUGINS/sqldrivers && cp "$SO_PATH" $QT_PLUGINS/sqldrivers/ ; \
+    else echo "警告：QtCipherSqlitePlugin 源码未找到" ; fi
+
+# 2) 修复 .pro + TARGET
+RUN sed -i \
+        -e 's|-L/opt/qt5\.[0-9][^ ]*plugins/sqldrivers||g' \
+        -e 's|^TARGET = .*|TARGET = '${TARGET_BIN}'|' \
+        AdoreMix.pro && grep -E '^(TARGET|LIBS)' AdoreMix.pro
+
+# 3) 编译主程序
+RUN export PATH=${QT_ROOT}/bin:$PATH && ${QT_ROOT}/bin/qmake AdoreMix.pro && make -j$(nproc)
+
+# 4) 验证
+RUN test -f ${TARGET_BIN} && ls -la ${TARGET_BIN} && file ${TARGET_BIN}
+
+# 5) 收集产物
+RUN mkdir -p /out/lib /out/platforms /out/sqldrivers /out/bearer /out/iconengines \
+             /out/imageformats /out/translations /out/mediaservice /out/audio \
+             /out/etc /out/conf /out/html /out/logs /out/var /out/dmp /out/tty /out/temp
+
+RUN cp ${TARGET_BIN} /out/ && chmod 0755 /out/${TARGET_BIN}
+
+# Qt 运行时（含 ICU56）
+RUN for lib in libQt5Core libQt5Network libQt5Sql libQt5WebSockets \
+               libQt5Multimedia libQt5Svg libQt5Concurrent libQt5Xml \
+               libQt5MultimediaGstTools libQt5OpenGL libQt5DBus libQt5Gui \
+               libicuuc libicui18n libicudata; do \
+        cp ${QT_ROOT}/lib/${lib}.so* /out/lib/ 2>/dev/null || true ; \
+    done
+
+# Qt plugins
+RUN for sub in platforms sqldrivers bearer iconengines imageformats mediaservice audio; do \
+        rm -rf /out/$sub && (cp -r ${QT_ROOT}/plugins/$sub /out/$sub 2>/dev/null || mkdir -p /out/$sub) ; \
+    done && mkdir -p /out/translations && cp ${QT_ROOT}/translations/qtbase_*.qm /out/translations/ 2>/dev/null || true
+
+# 第三方库（glibc 2.28 基线）；Qt 官方 gcc_64 的 Multimedia 依赖 pulse/GL
+RUN for lib in libhiredis libopus libopusfile libssl libcrypto \
+               libsqlite3 libmariadb libstdc++ libgcc_s libdouble-conversion libpcre2-16 \
+               libgssapi_krb5 libkrb5 libk5crypto libkrb5support libcom_err libkeyutils \
+               libpcre libz libglib-2.0 libpulse libpulse-mainloop-glib libGL libsqlitecipher \
+               libX11 libXext libxcb libICE libSM libXtst libsndfile libasyncns \
+               libXau libXi libgsm libFLAC libogg libvorbis libvorbisenc; do \
+        find /usr/lib64 /lib64 -name "${lib}*.so*" -exec cp -a {} /out/lib/ \; 2>/dev/null ; \
+    done
+
+# qt.conf
+RUN printf '[Paths]\nPlugins=./\nLibraries=./lib\n' > /out/qt.conf
+
+# 业务资源（扁平 etc）
+RUN mkdir -p /out/etc && cp -r etc/. /out/etc/ 2>/dev/null || true ; \
+    cp -r conf /out/conf 2>/dev/null || mkdir -p /out/conf ; \
+    cp -r html /out/html 2>/dev/null || mkdir -p /out/html ; \
+    for f in tts.js find.js findsc.js xiaoboshu.py .Adore.db; do \
+        [ -f "$f" ] && cp "$f" /out/ ; \
+    done
+
+# patchelf + symlink 解引用
+RUN cd /out && patchelf --set-rpath '$ORIGIN/lib' --force-rpath ${TARGET_BIN} 2>/dev/null || true
+RUN find /out -type l -exec sh -c 'target=$(readlink -f "$1") && [ -n "$target" ] && rm "$1" && cp "$target" "$1"' _ {} \; 2>/dev/null ; \
+    find /out -xtype l -delete 2>/dev/null
+
+# 验证依赖
+RUN cd /out && (ldd ${TARGET_BIN} | grep "not found" && echo "警告：有未解决的依赖" && exit 1 || echo "依赖完整")
+
+# 元信息
+RUN printf '{"version":"%s","platform":"linux","arch":"x64","bin":"%s","builtAt":"%s"}\n' \
+        "${ADORE_VERSION}" "${TARGET_BIN}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        > /out/.adoremix-native.json
+
+CMD ["bash", "-c", "find /out -maxdepth 2 -type f | sort"]
