@@ -28,7 +28,7 @@ module.exports = {
     bitrate: 48,
     Pastcmd: 6008,
     BjPort: 6004,
-    PackSize: 1024,
+    PackSize: 2048,
     RedisIP: '127.0.0.1',
     RedisPort: 6379,
     RedisAUTH: '',

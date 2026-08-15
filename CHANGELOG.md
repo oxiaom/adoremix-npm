@@ -2,6 +2,12 @@
 
 本文件记录 @oxiaom/adoremix 各版本变更。版本号同步主包 + 4-6 个平台子包。
 
+## 1.0.40 — 2026-08-15
+
+### 修复:mp3 流播放 Windows 卡死(实时喊话发一个包就停)
+- **PackSize 默认值 1024 → 2048**。单片机(CH32V307 + VS1003)mp3 预缓冲阈值是 2048 字节(`MP3_PREBUFFER_BYTES`),而服务器"发一个包等一个 5 字节 ACK"的流控,当 PackSize=1024 时一个包不够预缓冲,单片机会 `prebuffer stalled` 丢包不回 ACK,服务器等不到 ACK 停发 → 死锁。改为 2048 后一个包正好填满预缓冲,正常回 ACK 继续流。
+- 注:已部署的老版本需手动把 config.ini 的 `PackSize` 改成 `2048`(install --force 不覆盖 config.ini)。
+
 ## 1.0.38 — 2026-08-13
 
 ### 可选组件：设备配置管理 UI（config-manager，仅 Linux）
