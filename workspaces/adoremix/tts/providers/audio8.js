@@ -174,12 +174,13 @@ const AUDIO8_HEALTH_URL = `http://127.0.0.1:${AUDIO8_DEFAULT_PORT}/v1/models`;
 const AUDIO8_MODEL_DIR = '~/audio8_models/audio8-TTS-0.1B-ONNX-INT8';
 
 // 包管理器嗅探（apt/dnf/yum/apk/pacman）
+// 用 which 而非 command -v（Debian/Ubuntu 12+ 的 /bin/sh 没有 command 内建，且 PATH 不一定对）
 function detectPkgMgr() {
-  // 用 shell 执行 command -v，输出非空即表示存在（避免 execFileSync 在 exit 0 也抛 raiseForStatus）
   function exists(cmd) {
     try {
-      const out = execSync('command -v ' + cmd, { stdio: ['pipe', 'ignore', 'ignore'], encoding: 'utf8' });
-      return out && out.trim().length > 0;
+      const out = execSync('/bin/sh -c "which ' + cmd + ' 2>/dev/null || echo NOT_FOUND"', { encoding: 'utf8' });
+      const t = out.trim();
+      return t !== '' && t !== 'NOT_FOUND';
     } catch (e) { return false; }
   }
   if (exists('apt-get')) return 'apt';
