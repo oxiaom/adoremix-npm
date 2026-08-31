@@ -496,9 +496,23 @@ adoremix audio8 uninstall         # 卸载
 - 自动写 systemd unit（`/etc/systemd/system/audio8-tts.service`）并 enable + start
 - 修改本地 config.ini：`[TTS] provider=audio8, audio8_base_url=http://127.0.0.1:8024`
 
+### ⚠️ 已知限制(2026-08 端到端测试发现)
+
+- **网络受限/慢机器上 Audio8 install 不可用**:114(ubuntu 22.04 + 3.7G RAM + 公司限速网络)实测,
+  1. 装 venv 依赖 OK(numpy/onnxruntime/fastapi/tokenizers 都能用清华源装)
+  2. `pip install torch` 装上(~800MB,带 CUDA 13)
+  3. **但下 572MB 模型卡死**:HuggingFace `audio8-TTS-0.1B-ONNX-INT8` 模型 download 几十分钟完不成
+  4. **Audio8 服务要求模型目录**:`/root/audio8/model/`(或 `ARKTTS_MODEL_DIR` 环境变量)必须存在
+- **自托管方案**(适合公司内部):用 `adoremix audio8 install` 装好后,
+  从能下到模型的机器(开发机/有公网)用 `huggingface-cli download Audio8/audio8-TTS-0.1B-ONNX-INT8 --local-dir /tmp/audio8-model`,
+  然后 `scp -r /tmp/audio8-model/* root@<目标机>:/root/audio8/model/`,
+  124 上 `systemctl restart audio8-tts` 即可。
+- **国产 Linux 跑 Audio8 没测试过**,理论上支持(只要 Linux + python3.11 + ≥1GB RAM)
+
 ### 多机部署方案
-- 114(3.7G RAM,Ubuntu 22.04):**推荐装 Audio8**(内存富余,服务稳)
+- 114(3.7G RAM,Ubuntu 22.04):**推荐装 Audio8**(内存富余),但需确认网络能下 572MB 模型
 - 123(4G RAM,RK3528 arm64):AdoreMix 主程序跑,**不装 Audio8**,通过 `config.ini` 远程调 114 的 `http://192.168.1.114:8024`
+- **如果所有机器都装不上 Audio8**(网络/资源限制),全部用默认的 xf(讯飞) 或 edge(微软云) TTS,这俩不需要本地模型
 
 ---
 
