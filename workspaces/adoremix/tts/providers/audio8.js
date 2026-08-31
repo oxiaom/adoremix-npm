@@ -19,13 +19,14 @@
  * 声音克隆：3~10 秒参考音频，但需在 Audio8 服务端预设（请求时用 voice 参数指定）
  */
 
-const { execFileSync } = require('child_process');
+const { execFileSync, execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const https = require('https');
 const http = require('http');
 const { URL } = require('url');
+const logger = require('../../src/logger');
 
 // 中文常用 voice（Audio8 的 zh-CN voices，按性别分组）
 const VOICES = {
