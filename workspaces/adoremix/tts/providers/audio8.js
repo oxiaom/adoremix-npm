@@ -298,12 +298,32 @@ function install(opts) {
     }
   }
 
-  // git clone
-  try {
-    logger.log('=== 克隆 Audio8_TTS 仓库 ===');
-    execSync(`mkdir -p ~/audio8 && if [ ! -d ~/audio8/.git ]; then git clone ${AUDIO8_REPO} ~/audio8_temp && mv ~/audio8_temp/* ~/audio8_temp/.[!.]* ~/audio8/ 2>/dev/null; rm -rf ~/audio8_temp; else cd ~/audio8 && git pull; fi`, { stdio: 'inherit', shell: '/bin/bash' });
-  } catch (e) {
-    logger.error('克隆失败: ' + e.message.slice(0, 200));
+  // git clone（带重试和国内镜像备选，github 在公司网常断）
+  const MIRRORS = [
+    AUDIO8_REPO,                                                       // 官方
+    'https://ghproxy.cn/https://github.com/Audio8-AI/Audio8_TTS.git',   // 国内代理
+    'https://mirror.ghproxy.com/https://github.com/Audio8-AI/Audio8_TTS.git'
+  ];
+  let cloned = false;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    for (const url of MIRRORS) {
+      try {
+        logger.log(`=== 克隆 Audio8_TTS（第 ${attempt} 次尝试）: ${url} ===`);
+        execSync(`rm -rf ~/audio8_temp && git clone --depth=1 "${url}" ~/audio8_temp 2>&1 | tail -3`, { stdio: 'inherit', shell: '/bin/bash' });
+        execSync(`sh -c "cd ~/audio8_temp && (shopt -s dotglob; mv -- * ~/audio8/ 2>/dev/null || true)"`, { stdio: 'inherit', shell: '/bin/bash' });
+        execSync('rm -rf ~/audio8_temp', { stdio: 'ignore', shell: '/bin/bash' });
+        cloned = true;
+        break;
+      } catch (e) {
+        logger.warn(`克隆失败（${url.slice(0, 60)}...）: ${String(e.message).slice(0, 100)}`);
+      }
+    }
+    if (cloned) break;
+    execSync('sleep 5', { stdio: 'ignore', shell: '/bin/bash' });
+  }
+  if (!cloned) {
+    logger.error('所有镜像和重试都失败，无法克隆 Audio8_TTS 仓库');
+    logger.warn('解决：手动在 ~/audio8 下放好 Audio8_TTS 源码再重试 install（跳过 git clone 步骤）');
     return 1;
   }
 
