@@ -1,6 +1,6 @@
 {
   "name": "@oxiaom/adoremix",
-  "version": "1.0.45",
+  "version": "1.0.46",
   "description": "AdoreMix broadcast server - cross-platform installer, runner and service manager",
   "bin": {
     "adoremix": "./bin/adoremix.js"
