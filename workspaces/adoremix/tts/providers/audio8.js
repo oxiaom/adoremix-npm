@@ -211,6 +211,13 @@ function buildSystemdUnit() {
     try { execSync('command -v python3.11 2>/dev/null', { shell: '/bin/bash', stdio: 'pipe' }); return 'python3.11'; }
     catch (e) { return 'python3'; }
   })();
+  // systemd 不展开 ~，必须用绝对路径(root 下 $HOME=/root)
+  const home = (function(){
+    try { return execSync('/bin/bash -c "echo $HOME"', { shell: '/bin/bash', stdio: 'pipe', encoding: 'utf8' }).trim() || '/root'; }
+    catch (e) { return '/root'; }
+  })();
+  const deployDir = AUDIO8_DEPLOY_DIR.replace(/^~/, home);
+  const venvDir = AUDIO8_VENV_DIR.replace(/^~/, home);
   return `[Unit]
 Description=Audio8 TTS (AdoreMix)
 After=network.target
@@ -218,9 +225,9 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=${AUDIO8_DEPLOY_DIR}/onnx_runtime
-Environment=PATH=${AUDIO8_VENV_DIR}/bin:/usr/bin:/bin
-ExecStart=${AUDIO8_VENV_DIR}/bin/${pyBin} -m arktts_runtime.service --model-dir ./model --voices-dir ./model/voices --port ${AUDIO8_DEFAULT_PORT}
+WorkingDirectory=${deployDir}/onnx_runtime
+Environment=PATH=${venvDir}/bin:/usr/bin:/bin
+ExecStart=${venvDir}/bin/${pyBin} -m arktts_runtime.service --model-dir ./model --voices-dir ./model/voices --port ${AUDIO8_DEFAULT_PORT}
 Restart=on-failure
 RestartSec=5
 
