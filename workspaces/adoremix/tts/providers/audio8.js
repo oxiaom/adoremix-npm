@@ -175,13 +175,12 @@ const AUDIO8_MODEL_DIR = '~/audio8_models/audio8-TTS-0.1B-ONNX-INT8';
 
 // 包管理器嗅探（apt/dnf/yum/apk/pacman）
 function detectPkgMgr() {
-  function which(cmd) {
-    try { return execFileSync('command -v ' + cmd, { stdio: 'pipe', encoding: 'utf8' }).trim(); } catch (e) { return null; }
-  }
-  // 用 try/catch 区分 exit 0 vs 非 0（execFileSync 默认成功也抛错，绕过去）
+  // 用 shell 执行 command -v，输出非空即表示存在（避免 execFileSync 在 exit 0 也抛 raiseForStatus）
   function exists(cmd) {
-    try { execFileSync('command -v ' + cmd + ' >/dev/null 2>&1', { stdio: 'ignore' }); return true; }
-    catch (e) { return false; }
+    try {
+      const out = execSync('command -v ' + cmd, { stdio: ['pipe', 'ignore', 'ignore'], encoding: 'utf8' });
+      return out && out.trim().length > 0;
+    } catch (e) { return false; }
   }
   if (exists('apt-get')) return 'apt';
   if (exists('dnf')) return 'dnf';
