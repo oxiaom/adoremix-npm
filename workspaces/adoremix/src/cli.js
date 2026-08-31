@@ -471,11 +471,8 @@ function buildProgram() {
 
   audio8
     .command('install')
-    .description('通过 SSH 远程安装 Audio8 TTS 到 Linux 主机（默认 192.168.1.114:8024），自动启动 systemd 服务')
-    .option('--host <ip>', '远程主机 IP', '192.168.1.114')
-    .option('--user <name>', 'SSH 用户', 'oxiaom')
-    .option('--pass <pwd>', 'SSH 密码')
-    .option('--workdir <path>', '本地工作目录（写入 config.ini 用）')
+    .description('在本机（Linux）自动安装 Audio8 TTS + systemd 服务（端口 8024），改本地 config.ini；Windows 不支持')
+    .option('--workdir <path>', 'AdoreMix 工作目录（写入 config.ini 用）')
     .action(async (opts) => {
       const mod = require('../tts/providers/audio8');
       try {
@@ -488,10 +485,7 @@ function buildProgram() {
 
   audio8
     .command('uninstall')
-    .description('卸载远程 Linux 上的 Audio8 TTS 服务')
-    .option('--host <ip>', '远程主机 IP', '192.168.1.114')
-    .option('--user <name>', 'SSH 用户', 'oxiaom')
-    .option('--pass <pwd>', 'SSH 密码')
+    .description('卸载本机的 Audio8 TTS 服务')
     .action(async (opts) => {
       const mod = require('../tts/providers/audio8');
       try {
@@ -504,9 +498,8 @@ function buildProgram() {
 
   audio8
     .command('status')
-    .description('检查远程 Audio8 TTS 服务健康')
-    .option('--host <ip>', '远程主机 IP', '192.168.1.114')
-    .option('--url <url>', '自定义 base_url')
+    .description('检查本机 Audio8 TTS 服务健康（GET /v1/models）')
+    .option('--url <url>', '自定义 base_url，默认 http://127.0.0.1:8024')
     .action(async (opts) => {
       const mod = require('../tts/providers/audio8');
       try {

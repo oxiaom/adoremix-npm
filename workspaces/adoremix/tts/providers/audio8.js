@@ -158,8 +158,9 @@ function synthesize({ text, voice, volume, speed, outFile }, creds) {
 }
 
 // ===== audio8 install / uninstall / status（类似 nginx install 的可选组件）=====
-// 通过 SSH 远程部署到 Linux 主机，Windows 本机调用只需装 plink。
-// 默认目标：192.168.1.114:22 / 用户 oxiaom。改 SSH_TARGET/SSH_USER 环境变量或 --host/--user 参数即可换机器。
+// **本机部署**:在当前 adoremix 进程所在机器上直接装（不是 SSH）。
+// 各机器跑 `adoremix audio8 install` 就在自己身上起 Audio8 TTS 服务。
+// 仅 Linux 可装（依赖 Python3 + venv + systemd），Windows/macOS 直接提示不支持。
 const AUDIO8_DEFAULT_PORT = 8024;
 const AUDIO8_REPO = 'https://github.com/Audio8-AI/Audio8_TTS.git';
 const AUDIO8_DEPLOY_DIR = '~/audio8';
@@ -169,25 +170,40 @@ const AUDIO8_SYSTEMD_NAME = 'audio8-tts';
 const AUDIO8_SYSTEMD_PATH = '/etc/systemd/system/audio8-tts.service';
 const AUDIO8_HEALTH_URL = `http://127.0.0.1:${AUDIO8_DEFAULT_PORT}/v1/models`;
 
-function plink() {
-  for (const cmd of ['plink', '"C:\\Program Files\\PuTTY\\plink.exe"']) {
-    try { return execSync(cmd.replace(/"/g, '').split(' ')[0], { stdio: 'pipe' }); } catch (e) {}
-  }
-  try { return require('child_process').execSync('where plink', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim().split('\n')[0]; } catch (e) {}
+// 包管理器嗅探（apt/dnf/yum/apk/pacman）
+function detectPkgMgr() {
+  try {
+    if (execFileSync('which apt-get', { stdio: 'pipe' }) && true) return 'apt';
+  } catch (e) {}
+  try {
+    if (execFileSync('which dnf', { stdio: 'pipe' }) && true) return 'dnf';
+  } catch (e) {}
+  try {
+    if (execFileSync('which yum', { stdio: 'pipe' }) && true) return 'yum';
+  } catch (e) {}
+  try {
+    if (execFileSync('which apk', { stdio: 'pipe' }) && true) return 'apk';
+  } catch (e) {}
+  try {
+    if (execFileSync('which pacman', { stdio: 'pipe' }) && true) return 'pacman';
+  } catch (e) {}
   return null;
 }
 
-function sshExec(cmd, opts) {
-  opts = opts || {};
-  const host = opts.host || process.env.ADOREMIX_AUDIO8_SSH_HOST || '192.168.1.114';
-  const user = opts.user || process.env.ADOREMIX_AUDIO8_SSH_USER || 'oxiaom';
-  const pass = opts.pass || process.env.ADOREMIX_AUDIO8_SSH_PASS || '123123';
-  const pl = plink();
-  if (!pl) throw new Error('未找到 plink（PuTTY），请安装 PuTTY 或将其加入 PATH');
-  return execSync(`"${pl}" -ssh -batch -pw "${pass}" ${user}@${host} '${cmd.replace(/'/g, "'\\''")}'`, { stdio: 'pipe', encoding: 'utf8' });
+function systemInstallCmd(pkgMgr, pkgs) {
+  // pkgs: { name: 'pkg-name' } 数组
+  const list = pkgs.map(p => p.name).join(' ');
+  switch (pkgMgr) {
+    case 'apt': return `apt-get update && apt-get install -y ${list}`;
+    case 'dnf':
+    case 'yum': return `${pkgMgr} install -y ${list}`;
+    case 'apk': return `apk add ${list}`;
+    case 'pacman': return `pacman -Sy --noconfirm ${list}`;
+    default: return null;
+  }
 }
 
-function buildSystemdUnit(pyCmd) {
+function buildSystemdUnit() {
   return `[Unit]
 Description=Audio8 TTS (AdoreMix)
 After=network.target
@@ -208,94 +224,169 @@ WantedBy=multi-user.target
 
 function install(opts) {
   opts = opts || {};
-  logger.ok('开始远程安装 Audio8 TTS（目标: ' + (opts.host || '192.168.1.114') + '）');
-  const cmds = [
-    'echo "=== 系统检测 ==="',
-    'python3 --version',
-    'pip3 --version',
-    'git --version',
-    'echo "=== 安装系统依赖 ==="',
-    'apt-get update && apt-get install -y git python3-pip python3-venv ffmpeg',
-    'echo "=== clone 仓库（如果不存在）==="',
-    `if [ ! -d ${AUDIO8_DEPLOY_DIR} ]; then git clone ${AUDIO8_REPO} ${AUDIO8_DEPLOY_DIR}; else echo "已存在,跳过"; fi`,
-    'echo "=== 创建 venv 并装依赖 ==="',
-    `cd ${AUDIO8_DEPLOY_DIR}/onnx_runtime && python3 -m venv .venv`,
-    `${AUDIO8_VENV_DIR}/bin/pip install -U pip`,
-    `${AUDIO8_VENV_DIR}/bin/pip install -r ${AUDIO8_REQUIREMENTS}`,
-    'echo "=== 写 systemd 单元 ==="',
-    // systemd 单元写入使用 heredoc 转义（这里通过 echo + 重定向）
-    `bash -c 'cat > ${AUDIO8_SYSTEMD_PATH} <<\"EOF\"\n${buildSystemdUnit()}\nEOF'`,
-    'systemctl daemon-reload',
-    `systemctl enable ${AUDIO8_SYSTEMD_NAME}`,
-    `systemctl restart ${AUDIO8_SYSTEMD_NAME}`,
-    'echo "=== 等待服务健康（首次启动要下载 ~572MB 模型,最多 60s）==="',
-    `for i in $(seq 1 60); do sleep 2; if curl -sf ${AUDIO8_HEALTH_URL} >/dev/null 2>&1; then echo "OK after ${i} attempts"; break; fi; done`,
-    `curl -sf ${AUDIO8_HEALTH_URL} >/dev/null && echo "✓ Audio8 服务健康: http://127.0.0.1:${AUDIO8_DEFAULT_PORT}" || echo "⚠ 60s 内未就绪,可手动 systemctl status ${AUDIO8_SYSTEMD_NAME}"`
-  ];
-  const fullCmd = cmds.join(' && ');
-  try {
-    const out = sshExec(fullCmd, opts);
-    process.stdout.write(out);
-  } catch (e) {
-    logger.error('SSH 执行失败:' + e.message.slice(0, 200));
+  // 平台检查
+  if (process.platform !== 'linux') {
+    logger.error(`Audio8 TTS 仅支持 Linux（当前 ${process.platform}，Windows/macOS 上 ffmpeg/venv/systemd 不可用）`);
+    logger.log(`如需在 Windows 本机用 Audio8，请用 WSL2 或部署到 Linux 主机后通过 config.ini audio8_base_url 远程调用。`);
     return 1;
   }
-  // 修改本地 config.ini 的 [TTS] provider/base_url
+
+  // 探测包管理器
+  const pkgMgr = detectPkgMgr();
+  if (!pkgMgr) {
+    logger.error('未识别到包管理器（apt/dnf/yum/apk/pacman 均未找到）。Audio8 install 仅支持这些主流 Linux 发行版。');
+    return 1;
+  }
+  logger.ok(`检测到包管理器: ${pkgMgr}`);
+
+  // 包映射（按发行版提供 ffmpeg/git/python3）
+  // ffmpeg 在 RHEL 系官方源没有，要先装 epel-release
+  let sysPkgs = [
+    { name: 'git' },
+    { name: 'python3' },
+    { name: 'python3-pip' },     // Debian/Ubuntu
+    { name: 'python3-venv' },
+    { name: 'ffmpeg' }
+  ];
+  if (pkgMgr === 'dnf' || pkgMgr === 'yum') {
+    sysPkgs = [
+      { name: 'git' },
+      { name: 'python3' },
+      { name: 'python3-pip' },
+      { name: 'python3-virtualenv' },   // RHEL 系包名不同
+      { name: 'epel-release' },          // ffmpeg 在 EPEL
+      { name: 'ffmpeg' }
+    ];
+  }
+  if (pkgMgr === 'apk') {
+    sysPkgs = [
+      { name: 'git' },
+      { name: 'python3' },
+      { name: 'py3-pip' },
+      { name: 'ffmpeg' }
+    ];
+  }
+
+  try {
+    logger.log('=== 安装系统依赖 ===');
+    execSync(systemInstallCmd(pkgMgr, sysPkgs), { stdio: 'inherit' });
+    if (pkgMgr === 'dnf' || pkgMgr === 'yum') {
+      // EPEL 装好后再装 ffmpeg
+      try { execSync(`${pkgMgr} install -y ffmpeg --enablerepo=epel`, { stdio: 'inherit' }); } catch (e) { logger.warn('ffmpeg 安装失败（EPEL 装好后重试）: ' + e.message); }
+    }
+  } catch (e) {
+    logger.error('系统依赖安装失败: ' + e.message.slice(0, 200));
+    return 1;
+  }
+
+  // git clone
+  try {
+    logger.log('=== 克隆 Audio8_TTS 仓库 ===');
+    execSync(`mkdir -p ~/audio8 && if [ ! -d ~/audio8/.git ]; then git clone ${AUDIO8_REPO} ~/audio8_temp && mv ~/audio8_temp/* ~/audio8_temp/.[!.]* ~/audio8/ 2>/dev/null; rm -rf ~/audio8_temp; else cd ~/audio8 && git pull; fi`, { stdio: 'inherit', shell: '/bin/bash' });
+  } catch (e) {
+    logger.error('克隆失败: ' + e.message.slice(0, 200));
+    return 1;
+  }
+
+  // venv + pip install
+  try {
+    logger.log('=== 创建 venv 并安装 Python 依赖（首次需 5-10 分钟下载 torch 等）===');
+    execSync('python3 -m venv ~/.audio8_venv', { stdio: 'inherit', shell: '/bin/bash' });
+    execSync('source ~/.audio8_venv/bin/activate && pip install -U pip --quiet && pip install -r ~/audio8/onnx_runtime/requirements.txt --quiet', { stdio: 'inherit', shell: '/bin/bash' });
+  } catch (e) {
+    logger.error('Python 依赖安装失败: ' + e.message.slice(0, 200));
+    return 1;
+  }
+
+  // 写 systemd 单元
+  try {
+    fs.writeFileSync(AUDIO8_SYSTEMD_PATH, buildSystemdUnit(), 'utf8');
+    execSync('systemctl daemon-reload', { stdio: 'inherit', shell: '/bin/bash' });
+    execSync(`systemctl enable ${AUDIO8_SYSTEMD_NAME}`, { stdio: 'inherit', shell: '/bin/bash' });
+    execSync(`systemctl restart ${AUDIO8_SYSTEMD_NAME}`, { stdio: 'inherit', shell: '/bin/bash' });
+  } catch (e) {
+    logger.error('systemd 配置失败（无 systemd 容器？手动启动: ~/audio8_venv/bin/python -m arktts_runtime.service）: ' + e.message.slice(0, 200));
+    return 1;
+  }
+
+  // 等服务健康（含下载 572MB 模型，冷启动最多 60s）
+  logger.log('=== 等待服务健康（首次启动要下载 ~572MB 模型，最多 60 秒）===');
+  let ok = false;
+  for (let i = 1; i <= 30; i++) {
+    try {
+      execSync(`curl -sf ${AUDIO8_HEALTH_URL} >/dev/null 2>&1`);
+      logger.ok(`Audio8 服务在 ${i*2} 秒后就绪: ${AUDIO8_HEALTH_URL}`);
+      ok = true;
+      break;
+    } catch (e) {}
+    execSync('sleep 2', { stdio: 'pipe', shell: '/bin/bash' });
+  }
+  if (!ok) {
+    logger.warn('60 秒内未就绪，请手动 systemctl status ' + AUDIO8_SYSTEMD_NAME);
+    logger.log('也可直接前台启动测试: source ~/.audio8_venv/bin/activate && python -m arktts_runtime.service --model-dir ~/audio8/model --voices-dir ~/audio8/model/voices --port ' + AUDIO8_DEFAULT_PORT);
+  }
+
+  // 改本地 config.ini
   try {
     const cfg = require(path.join(__dirname, '..', 'src', 'config'));
-    const localHost = opts.host || '192.168.1.114';
-    cfg.setConfigValue(opts.workdir || path.join(os.homedir(), '.local', 'share', 'adoremix'), 'TTS.provider', 'audio8');
-    cfg.setConfigValue(opts.workdir || path.join(os.homedir(), '.local', 'share', 'adoremix'), 'TTS.audio8_base_url', `http://${localHost}:${AUDIO8_DEFAULT_PORT}`);
-    logger.ok(`本地 config.ini 已更新: provider=audio8, audio8_base_url=http://${localHost}:${AUDIO8_DEFAULT_PORT}`);
+    const wd = opts.workdir || process.env.ADOREMIX_WORKDIR || path.join(os.homedir(), '.local', 'share', 'adoremix');
+    cfg.setConfigValue(wd, 'TTS.provider', 'audio8');
+    cfg.setConfigValue(wd, 'TTS.audio8_base_url', `http://127.0.0.1:${AUDIO8_DEFAULT_PORT}`);
+    logger.ok(`config.ini 已更新: provider=audio8, audio8_base_url=http://127.0.0.1:${AUDIO8_DEFAULT_PORT}`);
   } catch (e) {
-    logger.warn('本地 config.ini 更新失败（可手动设置）:' + e.message.slice(0, 100));
+    logger.warn('config.ini 更新失败: ' + e.message);
   }
-  logger.ok('Audio8 TTS 远程安装完成');
-  logger.log(`访问: http://${opts.host || '192.168.1.114'}:${AUDIO8_DEFAULT_PORT}/docs`);
+
+  logger.ok(`Audio8 TTS 本机安装完成 → http://127.0.0.1:${AUDIO8_DEFAULT_PORT}`);
   return 0;
 }
 
 function uninstall(opts) {
-  opts = opts || {};
-  logger.ok('开始远程卸载 Audio8 TTS');
-  const cmds = [
-    `systemctl --now disable ${AUDIO8_SYSTEMD_NAME} 2>/dev/null; true`,
-    `systemctl stop ${AUDIO8_SYSTEMD_NAME} 2>/dev/null; true`,
-    `rm -f ${AUDIO8_SYSTEMD_PATH}`,
-    'systemctl daemon-reload',
-    `rm -rf ${AUDIO8_DEPLOY_DIR}`,
-    `rm -rf ~/.cache/huggingface/hub/models--Audio8*`
-  ];
-  try {
-    const out = sshExec(cmds.join(' && '), opts);
-    process.stdout.write(out);
-  } catch (e) {
-    logger.error('SSH 执行失败:' + e.message.slice(0, 200));
+  if (process.platform !== 'linux') {
+    logger.error('audio8 uninstall 仅 Linux 支持');
     return 1;
   }
-  logger.ok('Audio8 TTS 远程卸载完成');
+  try {
+    execSync(`systemctl --now disable ${AUDIO8_SYSTEMD_NAME} 2>/dev/null; true`, { stdio: 'pipe', shell: '/bin/bash' });
+    execSync(`systemctl stop ${AUDIO8_SYSTEMD_NAME} 2>/dev/null; true`, { stdio: 'pipe', shell: '/bin/bash' });
+    execSync(`rm -f ${AUDIO8_SYSTEMD_PATH} && systemctl daemon-reload`, { stdio: 'pipe', shell: '/bin/bash' });
+    execSync(`rm -rf ~/audio8 ~/audio8_venv`, { stdio: 'pipe', shell: '/bin/bash' });
+    execSync(`rm -rf ~/.cache/huggingface/hub/models--Audio8*`, { stdio: 'pipe', shell: '/bin/bash' });
+  } catch (e) {
+    logger.warn('uninstall 清理部分出错: ' + e.message);
+    return 1;
+  }
+  logger.ok('Audio8 TTS 已卸载');
   return 0;
 }
 
 async function status(opts) {
   opts = opts || {};
-  const baseUrl = (opts.url || process.env.ADOREMIX_AUDIO8_BASE_URL || `http://${opts.host || '192.168.1.114'}:${AUDIO8_DEFAULT_PORT}`);
-  const urlObj = new URL(`${baseUrl}/v1/models`);
-  const lib = urlObj.protocol === 'https:' ? require('https') : http;
-  return new Promise(resolve => {
-    const req = lib.request({ hostname: urlObj.hostname, port: urlObj.port, path: urlObj.pathname, method: 'GET', timeout: 5000 }, res => {
-      if (res.statusCode === 200) {
-        logger.ok(`Audio8 服务健康: ${baseUrl}/v1/models 返回 ${res.statusCode}`);
-        resolve(0);
-      } else {
-        logger.warn(`Audio8 服务异常: ${baseUrl} 返回 ${res.statusCode}`);
-        resolve(1);
-      }
+  const baseUrl = opts.url || process.env.ADOREMIX_AUDIO8_BASE_URL || `http://127.0.0.1:${AUDIO8_DEFAULT_PORT}`;
+  try {
+    const urlObj = new URL(`${baseUrl}/v1/models`);
+    const lib = urlObj.protocol === 'https:' ? require('https') : require('http');
+    await new Promise(resolve => {
+      const req = lib.request({ hostname: urlObj.hostname, port: urlObj.port, path: urlObj.pathname, method: 'GET', timeout: 5000 }, res => {
+        if (res.statusCode === 200) {
+          logger.ok(`Audio8 服务健康: ${baseUrl}/v1/models 返回 ${res.statusCode}`);
+          res.resume();
+          resolve(0);
+        } else {
+          logger.warn(`Audio8 服务异常: ${baseUrl} 返回 ${res.statusCode}`);
+          res.resume();
+          resolve(1);
+        }
+      });
+      req.on('error', err => { logger.warn(`Audio8 服务不可达: ${err.message}`); resolve(1); });
+      req.on('timeout', () => { req.destroy(); logger.warn(`Audio8 服务超时: ${baseUrl}`); resolve(1); });
+      req.end();
     });
-    req.on('error', err => { logger.warn(`Audio8 服务不可达: ${err.message}`); resolve(1); });
-    req.on('timeout', () => { req.destroy(); logger.warn(`Audio8 服务超时: ${baseUrl}`); resolve(1); });
-    req.end();
-  });
+    return 0;
+  } catch (e) {
+    logger.warn(`Audio8 status 检查失败: ${e.message}`);
+    return 1;
+  }
 }
 
 module.exports = { synthesize, checkDeps, VOICES, DEFAULT_BASE_URL, install, uninstall, status };
