@@ -105,6 +105,7 @@ module.exports = {
     minimax_token: '',
     edge_voice_override: '',
     audio8_base_url: 'http://127.0.0.1:8024',
-    audio8_voice_override: ''
+    audio8_voice_override: '',
+    audio8_model_dir: ''
   }
 };

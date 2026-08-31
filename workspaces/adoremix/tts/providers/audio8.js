@@ -170,24 +170,19 @@ const AUDIO8_REQUIREMENTS = 'onnx_runtime/requirements.txt';
 const AUDIO8_SYSTEMD_NAME = 'audio8-tts';
 const AUDIO8_SYSTEMD_PATH = '/etc/systemd/system/audio8-tts.service';
 const AUDIO8_HEALTH_URL = `http://127.0.0.1:${AUDIO8_DEFAULT_PORT}/v1/models`;
+// 自托管的预下载模型（可选，存到 ~/audio8_models/0.1B/ 下，避免每次 git clone 后再下 572MB）
+const AUDIO8_MODEL_DIR = '~/audio8_models/audio8-TTS-0.1B-ONNX-INT8';
 
 // 包管理器嗅探（apt/dnf/yum/apk/pacman）
 function detectPkgMgr() {
-  try {
-    if (execFileSync('which apt-get', { stdio: 'pipe' }) && true) return 'apt';
-  } catch (e) {}
-  try {
-    if (execFileSync('which dnf', { stdio: 'pipe' }) && true) return 'dnf';
-  } catch (e) {}
-  try {
-    if (execFileSync('which yum', { stdio: 'pipe' }) && true) return 'yum';
-  } catch (e) {}
-  try {
-    if (execFileSync('which apk', { stdio: 'pipe' }) && true) return 'apk';
-  } catch (e) {}
-  try {
-    if (execFileSync('which pacman', { stdio: 'pipe' }) && true) return 'pacman';
-  } catch (e) {}
+  function which(cmd) {
+    try { return execFileSync('command -v ' + cmd, { stdio: 'pipe', encoding: 'utf8' }).trim(); } catch (e) { return null; }
+  }
+  if (which('apt-get')) return 'apt';
+  if (which('dnf')) return 'dnf';
+  if (which('yum')) return 'yum';
+  if (which('apk')) return 'apk';
+  if (which('pacman')) return 'pacman';
   return null;
 }
 
@@ -278,6 +273,24 @@ function install(opts) {
   } catch (e) {
     logger.error('系统依赖安装失败: ' + e.message.slice(0, 200));
     return 1;
+  }
+
+  // 检查 config.ini 是否有预托管模型（audio8_model_dir）
+  let modelDir = '';
+  try {
+    const cfg = require(path.join(__dirname, '..', 'src', 'config'));
+    const wd = opts.workdir || process.env.ADOREMIX_WORKDIR || path.join(os.homedir(), '.local', 'share', 'adoremix');
+    modelDir = cfg.getConfigValue(wd, 'TTS.audio8_model_dir') || '';
+  } catch (e) {}
+  const modelLink = `~/audio8/onnx_runtime/model`;  // Audio8 期望的相对路径
+  // 如果有预托管模型目录，建软链指向
+  if (modelDir) {
+    try {
+      logger.log('=== 链接预托管模型 ' + modelDir + ' → ' + modelLink + ' ===');
+      execSync(`mkdir -p $(dirname ${modelLink}) && rm -rf ${modelLink} && ln -s ${modelDir} ${modelLink}`, { stdio: 'inherit', shell: '/bin/bash' });
+    } catch (e) {
+      logger.warn('链接模型失败: ' + e.message);
+    }
   }
 
   // git clone
