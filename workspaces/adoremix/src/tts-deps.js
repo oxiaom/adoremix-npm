@@ -50,6 +50,17 @@ const PROVIDER_DEPENDENCIES = {
     ],
     pipPkgs: [{ pkg: 'edge-tts', import: 'edge_tts' }],
     executables: [{ name: 'ffmpeg', cmd: 'ffmpeg' }, ...TRANSCODE_TOOLS]
+  },
+  audio8: {
+    nodeModules: [],         // 用 Node 内置 http/https
+    creds: [],                // 本地服务无 API key
+    systemPkgs: [
+      { name: 'ffmpeg', cmd: 'ffmpeg' }   // 转码用（实际 audio8 直接返回 mp3 不用 ffmpeg，但保留 fallback）
+    ],
+    pipPkgs: [],              // 纯 HTTP 调用，无 Python 依赖
+    executables: [...TRANSCODE_TOOLS],
+    // 额外：需要本地 Audio8 TTS 服务可达（检查时探测 /v1/models）
+    extraChecks: ['http_endpoint']
   }
 };
 
@@ -228,6 +239,41 @@ function checkDeps(workdir, providerName, cfg) {
       fixType: 'system',
       fixArgs: { pkgMgr, aptPkg: 'python3 python3-pip' }
     });
+  }
+
+  // audio8：探测本地服务可达性（GET /v1/models，超时 3 秒）
+  if (providerName === 'audio8') {
+    const http = require('http');
+    const https = require('https');
+    const url = require('url');
+    const audio8BaseUrl = (cfg && cfg.TTS && cfg.TTS.audio8_base_url) || 'http://127.0.0.1:7860';
+    let u;
+    try { u = new URL(audio8BaseUrl); } catch (e) {
+      issues.push({ severity: 'error', category: 'service', msg: `audio8_base_url 无效: ${audio8BaseUrl}（需 config.ini [TTS] audio8_base_url 配置，如 http://127.0.0.1:7860）`, autoFixable: false });
+    }
+    if (u) {
+      try {
+        const lib = u.protocol === 'https:' ? https : http;
+        const req = lib.request({
+          hostname: u.hostname,
+          port: u.port || (u.protocol === 'https:' ? 443 : 80),
+          path: '/v1/models',
+          method: 'GET',
+          timeout: 3000
+        }, res => {
+          if (res.statusCode !== 200) {
+            issues.push({ severity: 'error', category: 'service', msg: `Audio8 服务不可达：${audio8BaseUrl} 返回 HTTP ${res.statusCode}`, autoFixable: false });
+          }
+        });
+        req.on('error', err => {
+          issues.push({ severity: 'error', category: 'service', msg: `Audio8 服务不可达（${audio8BaseUrl}）：${err.message}。请确认 Audio8 TTS 服务已启动（参考 Audio8-AI/Audio8_TTS），并在 config.ini [TTS] audio8_base_url 配置正确地址。`, autoFixable: false });
+        });
+        req.on('timeout', () => { req.destroy(); issues.push({ severity: 'error', category: 'service', msg: `Audio8 服务超时（${audio8BaseUrl}/v1/models 3s 无响应）`, autoFixable: false }); });
+        req.end();
+      } catch (e) {
+        issues.push({ severity: 'error', category: 'service', msg: `audio8 服务探测失败：${e.message}`, autoFixable: false });
+      }
+    }
   }
 
   return { issues, provider: providerName };

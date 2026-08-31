@@ -11,6 +11,7 @@
  *   - xf:     讯飞 WebSocket（原 tts.js 逻辑，需 appid/apiSecret/apiKey）
  *   - minimax: MiniMax HTTP API（需 token）
  *   - edge:   python edge-tts（免费，需 python3 + ffmpeg）
+ *   - audio8: 本地 Audio8 TTS（OpenAI 兼容 API，需 audio8_base_url 配置 + ffmpeg）
  *
  * 凭证优先从 config.ini 读，命令行 appid/apiSecret/apiKey 兼容旧调用（仅 xf）。
  */
@@ -22,7 +23,8 @@ const ini = require('ini');
 const PROVIDERS = {
   xf: require('./providers/xf'),
   minimax: require('./providers/minimax'),
-  edge: require('./providers/edge')
+  edge: require('./providers/edge'),
+  audio8: require('./providers/audio8')
 };
 
 function log(...args) { console.log('[tts]', ...args); }

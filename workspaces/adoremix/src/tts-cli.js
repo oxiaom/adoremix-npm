@@ -29,6 +29,12 @@ const PROVIDER_INFO = {
     desc: 'Microsoft Edge TTS（python）',
     cost: '免费',
     needsPython: true
+  },
+  audio8: {
+    name: 'Audio8 TTS',
+    desc: '本地 Audio8 TTS（OpenAI 兼容 API）',
+    cost: '免费（自部署）',
+    needsPython: false
   }
 };
 

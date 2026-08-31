@@ -103,6 +103,8 @@ module.exports = {
     xf_apiKey: '',
     xf_voice_override: '',
     minimax_token: '',
-    edge_voice_override: ''
+    edge_voice_override: '',
+    audio8_base_url: 'http://127.0.0.1:7860',
+    audio8_voice_override: ''
   }
 };
