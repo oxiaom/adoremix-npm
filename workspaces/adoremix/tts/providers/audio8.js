@@ -205,6 +205,12 @@ function systemInstallCmd(pkgMgr, pkgs) {
 }
 
 function buildSystemdUnit() {
+  // Audio8 onnx_runtime 需要 numpy 2.4.3(需 Python ≥ 3.11),Ubuntu 22.04 默认 3.10
+  // 自动探测 python3.11(PPA/官方包),fallback 到 python3
+  const pyBin = (function(){
+    try { execFileSync('command -v python3.11', { stdio: 'pipe' }); return 'python3.11'; }
+    catch (e) { return 'python3'; }
+  })();
   return `[Unit]
 Description=Audio8 TTS (AdoreMix)
 After=network.target
@@ -214,7 +220,7 @@ Type=simple
 User=root
 WorkingDirectory=${AUDIO8_DEPLOY_DIR}/onnx_runtime
 Environment=PATH=${AUDIO8_VENV_DIR}/bin:/usr/bin:/bin
-ExecStart=${AUDIO8_VENV_DIR}/bin/python -m arktts_runtime.service --model-dir ./model --voices-dir ./model/voices --port ${AUDIO8_DEFAULT_PORT}
+ExecStart=${AUDIO8_VENV_DIR}/bin/${pyBin} -m arktts_runtime.service --model-dir ./model --voices-dir ./model/voices --port ${AUDIO8_DEFAULT_PORT}
 Restart=on-failure
 RestartSec=5
 
@@ -337,11 +343,15 @@ function install(opts) {
     return 1;
   }
 
-  // venv + pip install
+  // venv + pip install（Python 3.11+，numpy 2.4.3 需要）
+  const pyBase = (function(){
+    try { execFileSync('command -v python3.11', { stdio: 'pipe' }); return 'python3.11'; }
+    catch (e) { return 'python3'; }
+  })();
   try {
-    logger.log('=== 创建 venv 并安装 Python 依赖（首次需 5-10 分钟下载 torch 等）===');
-    execSync('python3 -m venv ~/.audio8_venv', { stdio: 'inherit', shell: '/bin/bash' });
-    execSync('source ~/.audio8_venv/bin/activate && pip install -U pip --quiet && pip install -r ~/audio8/onnx_runtime/requirements.txt --quiet', { stdio: 'inherit', shell: '/bin/bash' });
+    logger.log('=== 创建 venv 并安装 Python 依赖（首次需 5-10 分钟下载 torch 等,Python=' + pyBase + '）===');
+    execSync(`${pyBase} -m venv ~/.audio8_venv`, { stdio: 'inherit', shell: '/bin/bash' });
+    execSync(`source ~/.audio8_venv/bin/activate && pip install -U pip --quiet && pip install -r ~/audio8/onnx_runtime/requirements.txt --quiet`, { stdio: 'inherit', shell: '/bin/bash' });
   } catch (e) {
     logger.error('Python 依赖安装失败: ' + e.message.slice(0, 200));
     return 1;
