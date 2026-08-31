@@ -178,11 +178,16 @@ function detectPkgMgr() {
   function which(cmd) {
     try { return execFileSync('command -v ' + cmd, { stdio: 'pipe', encoding: 'utf8' }).trim(); } catch (e) { return null; }
   }
-  if (which('apt-get')) return 'apt';
-  if (which('dnf')) return 'dnf';
-  if (which('yum')) return 'yum';
-  if (which('apk')) return 'apk';
-  if (which('pacman')) return 'pacman';
+  // 用 try/catch 区分 exit 0 vs 非 0（execFileSync 默认成功也抛错，绕过去）
+  function exists(cmd) {
+    try { execFileSync('command -v ' + cmd + ' >/dev/null 2>&1', { stdio: 'ignore' }); return true; }
+    catch (e) { return false; }
+  }
+  if (exists('apt-get')) return 'apt';
+  if (exists('dnf')) return 'dnf';
+  if (exists('yum')) return 'yum';
+  if (exists('apk')) return 'apk';
+  if (exists('pacman')) return 'pacman';
   return null;
 }
 
