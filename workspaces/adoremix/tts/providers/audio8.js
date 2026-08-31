@@ -178,7 +178,7 @@ const AUDIO8_MODEL_DIR = '~/audio8_models/audio8-TTS-0.1B-ONNX-INT8';
 function detectPkgMgr() {
   function exists(cmd) {
     try {
-      const out = execSync('/bin/bash -c "which ' + cmd + ' 2>/dev/null || echo NOT_FOUND"', { encoding: 'utf8' });
+      const out = execSync('which ' + cmd + ' 2>/dev/null || echo NOT_FOUND', { shell: '/bin/bash', encoding: 'utf8' });
       const t = out.trim();
       return t !== '' && t !== 'NOT_FOUND';
     } catch (e) { return false; }
@@ -208,7 +208,7 @@ function buildSystemdUnit() {
   // Audio8 onnx_runtime 需要 numpy 2.4.3(需 Python ≥ 3.11),Ubuntu 22.04 默认 3.10
   // 自动探测 python3.11(PPA/官方包),fallback 到 python3
   const pyBin = (function(){
-    try { execFileSync('/bin/bash -c "command -v python3.11"', { stdio: 'pipe' }); return 'python3.11'; }
+    try { execSync('command -v python3.11 2>/dev/null', { shell: '/bin/bash', stdio: 'pipe' }); return 'python3.11'; }
     catch (e) { return 'python3'; }
   })();
   return `[Unit]
@@ -345,7 +345,7 @@ function install(opts) {
 
   // venv + pip install（Python 3.11+，numpy 2.4.3 需要）
   const pyBase = (function(){
-    try { execFileSync('/bin/bash -c "command -v python3.11"', { stdio: 'pipe' }); return 'python3.11'; }
+    try { execSync('command -v python3.11 2>/dev/null', { shell: '/bin/bash', stdio: 'pipe' }); return 'python3.11'; }
     catch (e) { return 'python3'; }
   })();
   try {
