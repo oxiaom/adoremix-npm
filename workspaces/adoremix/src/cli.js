@@ -510,6 +510,33 @@ function buildProgram() {
       }
     });
 
+  audio8
+    .command('fetch-model [url]')
+    .description('单独下载 Audio8 TTS 模型（572MB 0.1B INT8）到 /root/audio8/model/，与 audio8 install 解耦避免 install 卡住')
+    .action(async (url) => {
+      const mod = require('../tts/providers/audio8');
+      try {
+        process.exitCode = await mod.fetchModel({ url });
+      } catch (e) {
+        logger.error(e.message);
+        process.exitCode = 1;
+      }
+    });
+
+  // 顶级命令(不依赖 audio8 group)
+  program
+    .command('audio8-fetch-model [url]')
+    .description('下载 Audio8 TTS 模型（单独使用，不依赖 audio8 install）')
+    .action(async (url) => {
+      const mod = require('../tts/providers/audio8');
+      try {
+        process.exitCode = await mod.fetchModel({ url });
+      } catch (e) {
+        logger.error(e.message);
+        process.exitCode = 1;
+      }
+    });
+
   const cfgmgr = program
     .command('config-manager')
     .description('设备配置管理 UI（配置 IP / 修改 config.ini / 查看日志），端口 9877，开机自启');

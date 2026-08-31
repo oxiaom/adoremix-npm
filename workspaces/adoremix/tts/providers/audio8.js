@@ -471,4 +471,66 @@ async function status(opts) {
   }
 }
 
-module.exports = { synthesize, checkDeps, VOICES, DEFAULT_BASE_URL, install, uninstall, status };
+module.exports = { synthesize, checkDeps, VOICES, DEFAULT_BASE_URL, install, uninstall, status, fetchModel };
+
+// === fetchModel: 单独下载 Audio8 TTS 模型 ===
+// 默认 URL:HuggingFace 0.1B INT8(~572MB,公司网差可改为自家 OSS 链接)
+const MODEL_DEFAULT_URL = process.env.ADOREMIX_AUDIO8_MODEL_URL
+  || 'https://huggingface.co/Audio8/audio8-TTS-0.1B-ONNX-INT8/resolve/main/';
+// 模型要的所有文件(必须下完整,Audio8 启动会校验)
+const MODEL_FILES = [
+  'config.json', 'tokenizer.json', 'tokenizer_config.json', 'special_tokens_map.json',
+  'model.onnx', 'model.onnx.data'
+];
+
+async function downloadOne(baseUrl, file, targetDir, log) {
+  const url = baseUrl.replace(/\/$/, '') + '/' + file;
+  const target = path.join(targetDir, file);
+  return new Promise((resolve, reject) => {
+    const lib = url.startsWith('https:') ? require('https') : require('http');
+    const req = lib.get(url, response => {
+      if (response.statusCode !== 200) {
+        response.resume();
+        return reject(new Error(file + ' HTTP ' + response.statusCode));
+      }
+      const ws = require('fs').createWriteStream(target);
+      response.pipe(ws);
+      ws.on('finish', () => ws.close(() => resolve(file)));
+      ws.on('error', reject);
+    });
+    req.on('error', reject);
+    req.setTimeout(600000, () => req.destroy(new Error(file + ' timeout (10min)')));
+  });
+}
+
+async function fetchModel(opts) {
+  opts = opts || {};
+  const targetDir = process.env.ADOREMIX_AUDIO8_MODEL_DIR || '/root/audio8/model';
+  const baseUrl = opts.url || MODEL_DEFAULT_URL;
+  const log = (m) => console.log(m);
+
+  log('Audio8 模型下载 → ' + targetDir);
+  log('源 URL: ' + baseUrl);
+  if (!baseUrl.endsWith('/') && !baseUrl.includes('resolve/main')) {
+    log('  (URL 应以 /resolve/main/ 结尾,自动补)');
+  }
+  require('fs').mkdirSync(targetDir, { recursive: true });
+
+  let ok = 0, fail = 0;
+  for (const f of MODEL_FILES) {
+    try {
+      log('  → ' + f + ' ...');
+      await downloadOne(baseUrl, targetDir, f, log);
+      ok++;
+    } catch (e) {
+      log('  ✗ ' + f + ' 失败: ' + e.message);
+      fail++;
+    }
+  }
+  if (fail > 0) {
+    log('失败 ' + fail + ' 个,模型可能不完整(重启 Audio8 会报错)');
+    return 1;
+  }
+  log('✓ Audio8 模型就绪(' + ok + ' 个文件):' + targetDir);
+  return 0;
+}
