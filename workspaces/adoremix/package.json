@@ -41,7 +41,8 @@
     "templates",
     "tts",
     "webui",
-    "config-manager"
+    "config-manager",
+    "audio8-assets"
   ],
   "keywords": [
     "adoremix",

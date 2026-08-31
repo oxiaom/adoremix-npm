@@ -296,7 +296,8 @@ function install(opts) {
   // 检查 config.ini 是否有预托管模型（audio8_model_dir）
   let modelDir = '';
   try {
-    const cfg = require(path.join(__dirname, '..', 'src', 'config'));
+    // 从主包内置 src/config 读取（避免 tts/src/config 这种错误路径）
+    const cfg = require(path.join(__dirname, '..', '..', 'src', 'config'));
     const wd = opts.workdir || process.env.ADOREMIX_WORKDIR || path.join(os.homedir(), '.local', 'share', 'adoremix');
     modelDir = cfg.getConfigValue(wd, 'TTS.audio8_model_dir') || '';
   } catch (e) {}
@@ -311,30 +312,45 @@ function install(opts) {
     }
   }
 
-  // 拉 Audio8_TTS 源码：先试 git clone（多个镜像），全失败再走 codeload tarball（最后备选）
-  const MIRRORS = [
-    AUDIO8_REPO,                                                       // 官方 https
-    'https://ghproxy.cn/https://github.com/Audio8-AI/Audio8_TTS.git',   // 国内代理
-    'https://hub.fastgit.xyz/Audio8-AI/Audio8_TTS.git'                  // fastgit 镜像
-  ];
+  // 拉 Audio8_TTS 源码：先试内置 tarball（主包 audio8-assets/audio8-tts.tgz，离线），再 git 镜像，最后 codeload
   let cloned = false;
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    for (const url of MIRRORS) {
-      try {
-        logger.log(`=== 克隆 Audio8_TTS（第 ${attempt} 次尝试）: ${url} ===`);
-        execSync(`rm -rf ~/audio8_temp && git clone --depth=1 "${url}" ~/audio8_temp 2>&1 | tail -3`, { stdio: 'inherit', shell: '/bin/bash' });
-        execSync(`bash -c "cd ~/audio8_temp && (shopt -s dotglob; mv -- * ~/audio8/ 2>/dev/null || true)"`, { stdio: 'inherit', shell: '/bin/bash' });
-        execSync('rm -rf ~/audio8_temp', { stdio: 'ignore', shell: '/bin/bash' });
-        cloned = true;
-        break;
-      } catch (e) {
-        logger.warn(`克隆失败（${url.slice(0, 60)}...）: ${String(e.message).slice(0, 100)}`);
-      }
+  // 1) 主包内置 tarball（最稳，完全离线）
+  const BUNDLED_TARBALL = path.join(__dirname, '..', '..', 'audio8-assets', 'audio8-tts.tgz');
+  if (fs.existsSync(BUNDLED_TARBALL)) {
+    try {
+      logger.log('=== 使用主包内置 Audio8_TTS tarball（离线） ===');
+      execSync(`rm -rf ~/audio8 && mkdir -p ~/audio8 && tar xzf "${BUNDLED_TARBALL}" --strip-components=1 -C ~/audio8 && ls ~/audio8 | head -3`, { stdio: 'inherit', shell: '/bin/bash' });
+      cloned = true;
+    } catch (e) {
+      logger.warn('内置 tarball 解压失败：' + e.message);
     }
-    if (cloned) break;
-    execSync('sleep 5', { stdio: 'ignore', shell: '/bin/bash' });
+  } else {
+    logger.warn(`主包内置 tarball 不存在：${BUNDLED_TARBALL}`);
   }
-  // 备选：codeload 直接下 master 分支 tarball（绕过 git，HTTP 而已，国内更稳定）
+  // 2) Git 镜像（fallback）
+  if (!cloned) {
+    const MIRRORS = [
+      AUDIO8_REPO,
+      'https://ghproxy.cn/https://github.com/Audio8-AI/Audio8_TTS.git',
+      'https://hub.fastgit.xyz/Audio8-AI/Audio8_TTS.git'
+    ];
+    for (let attempt = 1; attempt <= 2 && !cloned; attempt++) {
+      for (const url of MIRRORS) {
+        try {
+          logger.log(`=== 克隆 Audio8_TTS（第 ${attempt} 次）: ${url} ===`);
+          execSync(`rm -rf ~/audio8_temp && git clone --depth=1 "${url}" ~/audio8_temp 2>&1 | tail -3`, { stdio: 'inherit', shell: '/bin/bash' });
+          execSync(`bash -c "cd ~/audio8_temp && (shopt -s dotglob; mv -- * ~/audio8/ 2>/dev/null || true)"`, { stdio: 'inherit', shell: '/bin/bash' });
+          execSync('rm -rf ~/audio8_temp', { stdio: 'ignore', shell: '/bin/bash' });
+          cloned = true;
+          break;
+        } catch (e) {
+          logger.warn(`克隆失败：${String(e.message).slice(0, 100)}`);
+        }
+      }
+      if (!cloned) execSync('sleep 5', { stdio: 'ignore', shell: '/bin/bash' });
+    }
+  }
+  // 3) codeload tarball（最后备选）
   if (!cloned) {
     try {
       logger.log('=== 备选：codeload github tarball ===');
@@ -345,8 +361,8 @@ function install(opts) {
     }
   }
   if (!cloned) {
-    logger.error('所有镜像和重试都失败，无法克隆 Audio8_TTS 仓库');
-    logger.warn('解决：手动在 ~/audio8 下放好 Audio8_TTS 源码再重试 install（跳过 git clone 步骤）');
+    logger.error('所有源都失败，无法获取 Audio8_TTS 源码');
+    logger.warn('解决：手动在 ~/audio8 下放好 Audio8_TTS 源码再重试 install');
     return 1;
   }
 
