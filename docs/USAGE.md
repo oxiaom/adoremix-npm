@@ -478,6 +478,24 @@ adoremix config-manager status       # 查看状态
 - 需 root + python3；Flask 缺失时自动 `python3 -m pip install flask`
 - 修改的 `config.ini` 指向 AdoreMix 工作目录（`ADOREMIX_WORKDIR` 环境变量）
 
+### Audio8 TTS（本地流式 TTS，自动远程部署）
+
+基于 [Audio8-AI/Audio8_TTS](https://github.com/Audio8-AI/Audio8_TTS)（0.1B 参数、Apache 2.0、支持中文）。通过 SSH 远程部署到 Linux 主机（默认 `192.168.1.114:8024`），自动启动 systemd 服务，本地 config.ini 自动切到 `provider=audio8`。
+
+```bash
+adoremix audio8 install           # 通过 SSH 部署到远程 Linux（默认 192.168.1.114）
+adoremix audio8 install --host 192.168.1.100 --user root   # 自定义目标
+adoremix audio8 status            # 健康检查（GET /v1/models）
+adoremix audio8 uninstall         # 远程卸载
+```
+
+- 部署后访问：`http://192.168.1.114:8024/docs`
+- 端口：**8024**（Audio8 默认）
+- 首次启动自动从 HuggingFace 下载 ~572MB 模型（0.1B-INT8）
+- 要求：远程 Linux 有 `python3 + git + ffmpeg`，至少 1GB RAM
+- Windows 本机要求：装了 PuTTY（`plink` 在 PATH 或 `C:\Program Files\PuTTY\plink.exe`）
+- 凭据可通过环境变量覆盖：`ADOREMIX_AUDIO8_SSH_HOST/USER/PASS`
+
 ---
 
 ## 配置项详解

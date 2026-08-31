@@ -17,6 +17,7 @@
 - **可选组件（仅 Linux）**
   - [NGINX 静态加速](USAGE.md#nginx-静态加速)
   - [设备配置管理 UI](USAGE.md#设备配置管理-uiconfig-manager)
+  - [Audio8 TTS 自动部署](USAGE.md#audio8-tts本地流式-tts自动远程部署)
 
 - **TTS 文字转语音**
   - [总览与对比](USAGE.md#tts-文字转语音)
