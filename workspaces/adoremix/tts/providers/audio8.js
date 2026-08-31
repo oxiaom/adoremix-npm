@@ -208,7 +208,7 @@ function buildSystemdUnit() {
   // Audio8 onnx_runtime 需要 numpy 2.4.3(需 Python ≥ 3.11),Ubuntu 22.04 默认 3.10
   // 自动探测 python3.11(PPA/官方包),fallback 到 python3
   const pyBin = (function(){
-    try { execFileSync('command -v python3.11', { stdio: 'pipe' }); return 'python3.11'; }
+    try { execFileSync('/bin/bash -c "command -v python3.11"', { stdio: 'pipe' }); return 'python3.11'; }
     catch (e) { return 'python3'; }
   })();
   return `[Unit]
@@ -345,7 +345,7 @@ function install(opts) {
 
   // venv + pip install（Python 3.11+，numpy 2.4.3 需要）
   const pyBase = (function(){
-    try { execFileSync('command -v python3.11', { stdio: 'pipe' }); return 'python3.11'; }
+    try { execFileSync('/bin/bash -c "command -v python3.11"', { stdio: 'pipe' }); return 'python3.11'; }
     catch (e) { return 'python3'; }
   })();
   try {
