@@ -178,7 +178,7 @@ const AUDIO8_MODEL_DIR = '~/audio8_models/audio8-TTS-0.1B-ONNX-INT8';
 function detectPkgMgr() {
   function exists(cmd) {
     try {
-      const out = execSync('/bin/sh -c "which ' + cmd + ' 2>/dev/null || echo NOT_FOUND"', { encoding: 'utf8' });
+      const out = execSync('/bin/bash -c "which ' + cmd + ' 2>/dev/null || echo NOT_FOUND"', { encoding: 'utf8' });
       const t = out.trim();
       return t !== '' && t !== 'NOT_FOUND';
     } catch (e) { return false; }
@@ -316,7 +316,7 @@ function install(opts) {
       try {
         logger.log(`=== 克隆 Audio8_TTS（第 ${attempt} 次尝试）: ${url} ===`);
         execSync(`rm -rf ~/audio8_temp && git clone --depth=1 "${url}" ~/audio8_temp 2>&1 | tail -3`, { stdio: 'inherit', shell: '/bin/bash' });
-        execSync(`sh -c "cd ~/audio8_temp && (shopt -s dotglob; mv -- * ~/audio8/ 2>/dev/null || true)"`, { stdio: 'inherit', shell: '/bin/bash' });
+        execSync(`bash -c "cd ~/audio8_temp && (shopt -s dotglob; mv -- * ~/audio8/ 2>/dev/null || true)"`, { stdio: 'inherit', shell: '/bin/bash' });
         execSync('rm -rf ~/audio8_temp', { stdio: 'ignore', shell: '/bin/bash' });
         cloned = true;
         break;
