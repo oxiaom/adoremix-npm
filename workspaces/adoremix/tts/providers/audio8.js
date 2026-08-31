@@ -298,11 +298,11 @@ function install(opts) {
     }
   }
 
-  // git clone（带重试和国内镜像备选，github 在公司网常断）
+  // 拉 Audio8_TTS 源码：先试 git clone（多个镜像），全失败再走 codeload tarball（最后备选）
   const MIRRORS = [
-    AUDIO8_REPO,                                                       // 官方
+    AUDIO8_REPO,                                                       // 官方 https
     'https://ghproxy.cn/https://github.com/Audio8-AI/Audio8_TTS.git',   // 国内代理
-    'https://mirror.ghproxy.com/https://github.com/Audio8-AI/Audio8_TTS.git'
+    'https://hub.fastgit.xyz/Audio8-AI/Audio8_TTS.git'                  // fastgit 镜像
   ];
   let cloned = false;
   for (let attempt = 1; attempt <= 2; attempt++) {
@@ -320,6 +320,16 @@ function install(opts) {
     }
     if (cloned) break;
     execSync('sleep 5', { stdio: 'ignore', shell: '/bin/bash' });
+  }
+  // 备选：codeload 直接下 master 分支 tarball（绕过 git，HTTP 而已，国内更稳定）
+  if (!cloned) {
+    try {
+      logger.log('=== 备选：codeload github tarball ===');
+      execSync(`rm -rf ~/audio8 && mkdir -p ~/audio8 && cd /tmp && curl -fL --retry 3 --connect-timeout 10 https://codeload.github.com/Audio8-AI/Audio8_TTS/tar.gz/master -o audio8.tar.gz && tar xzf audio8.tar.gz --strip-components=1 -C ~/audio8 && rm -f audio8.tar.gz && ls ~/audio8 | head -3`, { stdio: 'inherit', shell: '/bin/bash' });
+      cloned = true;
+    } catch (e) {
+      logger.error('codeload 也失败：' + String(e.message).slice(0, 200));
+    }
   }
   if (!cloned) {
     logger.error('所有镜像和重试都失败，无法克隆 Audio8_TTS 仓库');
