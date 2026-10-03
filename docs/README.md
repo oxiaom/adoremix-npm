@@ -5,6 +5,25 @@
 [![npm version](https://img.shields.io/npm/v/@oxiaom/adoremix.svg)](https://www.npmjs.com/package/@oxiaom/adoremix)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+## 💰 开源与收费说明
+
+> ✅ **软件开源 MIT 协议，自行部署完全免费商用；仅当选择中国电信托管运维服务时，才产生每月 1.8~2.5 元的运营成本费。**
+
+本项目服务端、客户端代码已在 GitHub 开源，采用 MIT 开源协议。
+
+1. **软件本身：永久免费，无版权费用**
+   任何个人、机构、企事业单位、学校均可自由使用、商用，支持自行下载源码、独立安装部署，
+   **无授权费、无功能限制、无版权约束**。
+
+2. **可选托管服务（按需选择，非强制）**
+   如需免去自建服务器、运维维护的工作，可选择由中国电信提供平台托管运营服务。
+   电信仅收取基础运营成本费：**1.8 元 / 月 ～ 2.5 元 / 月**
+
+   ⚠️ 此费用为云托管运维服务费，**不是软件授权费**，不使用该托管方案则无需支付这笔费用。
+
+3. **发票说明**
+   若办理电信托管服务产生缴费，可凭缴费记录联系我们申请开具发票。
+
 ## ✨ 特性
 
 - 🎯 **一键部署** — `npm install -g @oxiaom/adoremix` 跨 6 平台（Windows / Linux x64 / ARM64 / ARM / macOS x64 / macOS ARM64）
