@@ -319,8 +319,21 @@ function install(opts) {
   if (fs.existsSync(BUNDLED_TARBALL)) {
     try {
       logger.log('=== 使用主包内置 Audio8_TTS tarball（离线） ===');
-      execSync(`rm -rf ~/audio8 && mkdir -p ~/audio8 && tar xzf "${BUNDLED_TARBALL}" --strip-components=1 -C ~/audio8 && ls ~/audio8 | head -3`, { stdio: 'inherit', shell: '/bin/bash' });
-      cloned = true;
+      // tarball 可能带 1~2 层包装目录(如 audio8src/Audio8_TTS-master/)。
+      // 不用 --strip-components(层数不定),解压后在 ~/audio8 里循环平仓:
+      // 只要目录下只有一个子目录且还看不到 onnx_runtime/,就把子目录内容上提,最多 3 层。
+      execSync(`rm -rf ~/audio8 && mkdir -p ~/audio8 && tar xzf "${BUNDLED_TARBALL}" -C ~/audio8 && ` +
+        `cd ~/audio8 && for i in 1 2 3; do ` +
+        `[ -f onnx_runtime/requirements.txt ] && break; ` +
+        `single=$(ls -A | wc -l); [ "$single" = "1" ] || break; ` +
+        `d=$(ls -A); [ -d "$d" ] || break; ` +
+        `mv "$d"/* . 2>/dev/null; mv "$d"/.[!.]* . 2>/dev/null; rmdir "$d" 2>/dev/null || true; ` +
+        `done; ls ~/audio8 | head -5`, { stdio: 'inherit', shell: '/bin/bash' });
+      // 平仓后必须能看到 onnx_runtime/requirements.txt,否则视为解压失败
+      const flat = execSync('[ -f ~/audio8/onnx_runtime/requirements.txt ] && echo OK || echo MISSING',
+        { shell: '/bin/bash', encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+      if (flat === 'OK') cloned = true;
+      else logger.warn('内置 tarball 解压后未找到 onnx_runtime/requirements.txt（目录层级异常）');
     } catch (e) {
       logger.warn('内置 tarball 解压失败：' + e.message);
     }
@@ -365,16 +378,38 @@ function install(opts) {
     logger.warn('解决：手动在 ~/audio8 下放好 Audio8_TTS 源码再重试 install');
     return 1;
   }
+  // 统一校验目录结构(git clone 路径也可能带包装目录)
+  const layoutOk = execSync('[ -f ~/audio8/onnx_runtime/requirements.txt ] && echo OK || echo MISSING',
+    { shell: '/bin/bash', encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+  if (layoutOk !== 'OK') {
+    logger.error('~/audio8 目录结构异常：未找到 onnx_runtime/requirements.txt（可能多了包装目录）');
+    logger.log('当前内容: ' + execSync('ls ~/audio8', { shell: '/bin/bash', encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim().replace(/\n/g, ' '));
+    return 1;
+  }
 
   // venv + pip install（Python 3.11+，numpy 2.4.3 需要）
+  // venv 路径必须与 AUDIO8_VENV_DIR/buildSystemdUnit 一致(~/audio8/onnx_runtime/.venv),
+  // 否则 systemd ExecStart 指向不存在的解释器,服务起不来
   const pyBase = (function(){
     try { execSync('command -v python3.11 2>/dev/null', { shell: '/bin/bash', stdio: 'pipe' }); return 'python3.11'; }
     catch (e) { return 'python3'; }
   })();
+  const venvDir = AUDIO8_VENV_DIR.replace(/^~/, os.homedir());
   try {
     logger.log('=== 创建 venv 并安装 Python 依赖（首次需 5-10 分钟下载 torch 等,Python=' + pyBase + '）===');
-    execSync(`${pyBase} -m venv ~/.audio8_venv`, { stdio: 'inherit', shell: '/bin/bash' });
-    execSync(`source ~/.audio8_venv/bin/activate && pip install -U pip --quiet && pip install -r ~/audio8/onnx_runtime/requirements.txt --quiet`, { stdio: 'inherit', shell: '/bin/bash' });
+    execSync(`${pyBase} -m venv ${venvDir}`, { stdio: 'inherit', shell: '/bin/bash' });
+    // torch 等大包走清华镜像(国内/公司网下官方 PyPI 常超时),失败再回退官方源。
+    // requirements.txt 缺 tokenizers(Audio8 运行需要),补装。
+    const pipCmd = (idx) =>
+      `source ${venvDir}/bin/activate && pip install -U pip --quiet && ` +
+      `pip install -r ~/audio8/onnx_runtime/requirements.txt --quiet ${idx} && ` +
+      `pip install tokenizers --quiet ${idx}`;
+    try {
+      execSync(pipCmd('--index-url https://pypi.tuna.tsinghua.edu.cn/simple'), { stdio: 'inherit', shell: '/bin/bash' });
+    } catch (e) {
+      logger.warn('清华镜像安装失败，回退官方 PyPI 重试: ' + String(e.message).slice(0, 150));
+      execSync(pipCmd(''), { stdio: 'inherit', shell: '/bin/bash' });
+    }
   } catch (e) {
     logger.error('Python 依赖安装失败: ' + e.message.slice(0, 200));
     return 1;
@@ -391,8 +426,12 @@ function install(opts) {
     return 1;
   }
 
-  // 等服务健康（含下载 572MB 模型，冷启动最多 60s）
-  logger.log('=== 等待服务健康（首次启动要下载 ~572MB 模型，最多 60 秒）===');
+  // 等服务健康（模型单独用 audio8-fetch-model 下载，未下模型时服务起不来是预期）
+  const modelReady = fs.existsSync(path.join(os.homedir(), 'audio8', 'onnx_runtime', 'model', 'runtime_manifest.json'));
+  if (!modelReady) {
+    logger.warn('模型未下载（' + (cloned ? '正常，模型与 install 解耦' : '') + '）: 先执行 adoremix audio8-fetch-model 下载 ~423MB 模型,再 systemctl restart ' + AUDIO8_SYSTEMD_NAME);
+  }
+  logger.log('=== 等待服务健康（最多 60 秒）===');
   let ok = false;
   for (let i = 1; i <= 30; i++) {
     try {
@@ -404,8 +443,8 @@ function install(opts) {
     execSync('sleep 2', { stdio: 'pipe', shell: '/bin/bash' });
   }
   if (!ok) {
-    logger.warn('60 秒内未就绪，请手动 systemctl status ' + AUDIO8_SYSTEMD_NAME);
-    logger.log('也可直接前台启动测试: source ~/.audio8_venv/bin/activate && python -m arktts_runtime.service --model-dir ~/audio8/model --voices-dir ~/audio8/model/voices --port ' + AUDIO8_DEFAULT_PORT);
+    logger.warn('60 秒内未就绪: ' + (modelReady ? '请手动 systemctl status ' + AUDIO8_SYSTEMD_NAME : '模型缺失所致,先跑 adoremix audio8-fetch-model'));
+    logger.log('前台排查: cd ~/audio8/onnx_runtime && .venv/bin/' + pyBase + ' -m arktts_runtime.service --model-dir ./model --voices-dir ./model/voices --port ' + AUDIO8_DEFAULT_PORT);
   }
 
   // 改本地 config.ini
@@ -432,7 +471,7 @@ function uninstall(opts) {
     execSync(`systemctl --now disable ${AUDIO8_SYSTEMD_NAME} 2>/dev/null; true`, { stdio: 'pipe', shell: '/bin/bash' });
     execSync(`systemctl stop ${AUDIO8_SYSTEMD_NAME} 2>/dev/null; true`, { stdio: 'pipe', shell: '/bin/bash' });
     execSync(`rm -f ${AUDIO8_SYSTEMD_PATH} && systemctl daemon-reload`, { stdio: 'pipe', shell: '/bin/bash' });
-    execSync(`rm -rf ~/audio8 ~/audio8_venv`, { stdio: 'pipe', shell: '/bin/bash' });
+    execSync(`rm -rf ~/audio8 ~/audio8_venv ~/.audio8_venv`, { stdio: 'pipe', shell: '/bin/bash' });
     execSync(`rm -rf ~/.cache/huggingface/hub/models--Audio8*`, { stdio: 'pipe', shell: '/bin/bash' });
   } catch (e) {
     logger.warn('uninstall 清理部分出错: ' + e.message);
