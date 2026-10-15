@@ -2,24 +2,24 @@
 
 /**
  * Audio8 TTS provider
- * 调用方式：HTTP 调用本地 Audio8 TTS 服务（OpenAI 兼容 /v1/audio/speech）
- * 支持流式 MP3 输出（设备边收边播，匹配现有 quemp3 推送管道）
+ * 调用方式：HTTP 调用本地 Audio8 TTS 服务（OpenAI 兼容路径 POST /v1/audio/speech）
+ * 服务只返回 WAV（response_format 仅支持 wav|pcm）→ 本地 ffmpeg 转 MP3 给设备管道
  *
- * 服务部署参考（Audio8-AI/Audio8_TTS）：
- *   git clone https://github.com/Audio8-AI/Audio8_TTS.git ~/audio8
- *   cd ~/audio8/onnx_runtime && python3 -m venv .venv && . .venv/bin/activate
- *   pip install -r requirements.txt    # torch/transformers/onnxruntime 等
- *   bash start_server.sh               # 默认监听 http://0.0.0.0:8024
- *   首次启动自动从 HuggingFace 下载 ~572MB 模型(0.1B-INT8)
+ * 部署：adoremix audio8 install（装 onnx_runtime_0_1b_int8 + venv + systemd）
+ *       adoremix audio8-fetch-model（下 ~423MB 0.1B INT8 模型 + 生成默认音色）
+ *       systemctl restart audio8-tts
+ * 端点：GET /api/health 健康检查；voice 必填（default=模型内置参考音）
  *
  * 凭证：不需要 API Key（本地服务）
- * 依赖：lame（mp3 转码），ffmpeg（HTTP 流 → mp3）
+ * 依赖：ffmpeg（WAV → MP3 转码，必需）
  *
- * 速度支持：x-speed 头（0.5~2.0，1.0=正常；2.0=2x 加速）
- * 声音克隆：3~10 秒参考音频，但需在 Audio8 服务端预设（请求时用 voice 参数指定）
+ * 性能提示：CPU int8 推理慢（2 核 Celeron 实测 ~15s 生成 1s 音频，线程数已按核数自适应），
+ * 适合定时广播预生成，弱 CPU 不建议实时喊话。
+ * 声音克隆：0.5-30s 参考音频 + 转写文本，POST /api/voices/register（需额外下 registration 模型，
+ * adoremix audio8-fetch-model --registration）
  */
 
-const { execFileSync, execSync } = require('child_process');
+const { execFileSync, execSync, execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -28,23 +28,18 @@ const http = require('http');
 const { URL } = require('url');
 const logger = require('../../src/logger');
 
-// 中文常用 voice（Audio8 的 zh-CN voices，按性别分组）
+// Audio8 没有预置音色库(每个音色需注册克隆)。install/fetch-model 会自动把模型内置
+// 参考音物化为 default 音色——所有短名先都映射到 default,注册克隆音色后再扩展。
 const VOICES = {
-  // 女声
-  xiaoxiao:  'zh-CN-XiaoxiaoNeural',    // 晓晓（温柔女声）
-  xiaoyi:    'zh-CN-XiaoyiNeural',      // 晓伊（活力女声）
-  xiaomo:    'zh-CN-XiaomoNeural',      // 晓墨（文艺女声）
-  xiaoxuan:  'zh-CN-XiaoxuanNeural',    // 晓萱（新闻女声）
-  // 男声
-  yunxi:     'zh-CN-YunxiNeural',       // 云希（青年男声）
-  yunjian:   'zh-CN-YunjianNeural',     // 云健（浑厚男声）
-  yunyang:   'zh-CN-YunyangNeural',     // 云扬（播音男声）
-  // 默认
-  default:   'zh-CN-XiaoxiaoNeural'
+  xiaoxiao: 'default', xiaoyi: 'default', xiaomo: 'default', xiaoxuan: 'default',
+  yunxi: 'default', yunjian: 'default', yunyang: 'default',
+  default: 'default'
 };
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:8024';
-const DEFAULT_TIMEOUT_MS = 30000;
+// 弱 CPU 上 0.1B int8 合成很慢(实测 2 核 Celeron 约 15s/1s 音频),
+// 服务端算完才回包,socket 空闲时间长,超时必须放宽到 10 分钟
+const DEFAULT_TIMEOUT_MS = 600000;
 
 function checkDeps() {
   const issues = [];
@@ -90,6 +85,18 @@ function streamToFile(audioStream, outFile) {
   });
 }
 
+// ffmpeg WAV → MP3（Audio8 的 /v1/audio/speech 只支持 wav|pcm，设备端要 mp3，本地转码）
+function transcodeToMp3(wavFile, mp3File) {
+  return new Promise((resolve, reject) => {
+    execFile('ffmpeg',
+      ['-y', '-loglevel', 'error', '-i', wavFile, '-codec:a', 'libmp3lame', '-qscale:a', '4', mp3File],
+      (err, stdout, stderr) => {
+        if (err) return reject(new Error('ffmpeg WAV→MP3 转码失败: ' + String(stderr || err.message).split('\n')[0]));
+        resolve();
+      });
+  });
+}
+
 function synthesize({ text, voice, volume, speed, outFile }, creds) {
   return new Promise((resolve, reject) => {
     const issues = checkDeps();
@@ -99,14 +106,9 @@ function synthesize({ text, voice, volume, speed, outFile }, creds) {
 
     const baseUrl = (creds && creds.audio8_base_url) || DEFAULT_BASE_URL;
     const wantedVoice = VOICES[voice] || VOICES.default;
-    // 音量：Audio8 用 dB 偏移（-6~6 dB），UI 传的是 0~100 百分比，转 dB
-    const vo = parseInt(volume) || 50;
-    const volumeDb = Math.round((vo - 50) * 0.12);
-    // 速度：Audio8 用 0.5~2.0 倍速，UI 传 0~100 转 0.5~2.0
-    const sp = parseInt(speed) || 50;
-    const speedMul = 0.5 + (sp / 100) * 1.5;
 
-    // OpenAI 兼容调用：POST /v1/audio/speech，body=json，response=audio/mpeg 流
+    // OpenAI 兼容路径:POST /v1/audio/speech。仅支持 response_format=wav|pcm,
+    // 音量/语速服务端不支持(静默忽略),mp3 由本地 ffmpeg 转码。
     let urlObj;
     try { urlObj = new URL(baseUrl); } catch (e) {
       return reject(new Error(`Audio8 服务地址无效: ${baseUrl}（请在 config.ini [TTS] audio8_base_url 配置，例 http://127.0.0.1:8024）`));
@@ -115,10 +117,7 @@ function synthesize({ text, voice, volume, speed, outFile }, creds) {
     const postData = JSON.stringify({
       input: text,
       voice: wantedVoice,
-      model: 'audio8-tts',
-      response_format: 'mp3',
-      speed: speedMul,
-      volume: volumeDb
+      response_format: 'wav'
     });
     const opts = {
       hostname: urlObj.hostname,
@@ -141,17 +140,24 @@ function synthesize({ text, voice, volume, speed, outFile }, creds) {
         });
         return;
       }
-      // 流式保存
-      streamToFile(res, outFile)
-        .then(bytes => resolve({ bytes }))
+      // 服务端算完才回 WAV(弱 CPU 上要几十秒到几分钟) → 落临时 wav → ffmpeg 转 mp3
+      const wavTmp = outFile + '.a8wav';
+      streamToFile(res, wavTmp)
+        .then(() => transcodeToMp3(wavTmp, outFile))
+        .then(() => {
+          try { fs.unlinkSync(wavTmp); } catch (e) {}
+          let bytes = 0;
+          try { bytes = fs.statSync(outFile).size; } catch (e) {}
+          resolve({ bytes });
+        })
         .catch(reject);
     });
     req.on('error', err => {
-      reject(new Error(`Audio8 连接失败（${baseUrl}）: ${err.message}。请确认 Audio8 TTS 服务已启动，且 config.ini [TTS] audio8_base_url 配置正确。`));
+      reject(new Error(`Audio8 连接失败（${baseUrl}）: ${err.message}。请确认 Audio8 TTS 服务已启动（adoremix audio8 status），且 config.ini [TTS] audio8_base_url 配置正确。`));
     });
     req.on('timeout', () => {
       req.destroy();
-      reject(new Error(`Audio8 请求超时（${DEFAULT_TIMEOUT_MS / 1000}s）。服务可能在转码长文本。`));
+      reject(new Error(`Audio8 请求超时（${DEFAULT_TIMEOUT_MS / 1000}s）。弱 CPU 上合成慢属正常(约 15s/1s 音频)，可稍后重试或换短文本。`));
     });
     req.write(postData);
     req.end();
@@ -165,13 +171,14 @@ function synthesize({ text, voice, volume, speed, outFile }, creds) {
 const AUDIO8_DEFAULT_PORT = 8024;
 const AUDIO8_REPO = 'https://github.com/Audio8-AI/Audio8_TTS.git';
 const AUDIO8_DEPLOY_DIR = '~/audio8';
-const AUDIO8_VENV_DIR = '~/audio8/onnx_runtime/.venv';
-const AUDIO8_REQUIREMENTS = 'onnx_runtime/requirements.txt';
+// 0.1B INT8 模型必须配套 onnx_runtime_0_1b_int8/ 运行时（官方模型卡明示:
+// onnx_runtime/ 目录是 0.6B INT4 专用,与 0.1B INT8 图不兼容——实测 cache 输入名对不上必报 KeyError）
+const AUDIO8_RUNTIME_DIR = 'onnx_runtime_0_1b_int8';
+const AUDIO8_VENV_DIR = `~/audio8/${AUDIO8_RUNTIME_DIR}/.venv`;
+const AUDIO8_REQUIREMENTS = `${AUDIO8_RUNTIME_DIR}/requirements.txt`;
 const AUDIO8_SYSTEMD_NAME = 'audio8-tts';
 const AUDIO8_SYSTEMD_PATH = '/etc/systemd/system/audio8-tts.service';
-const AUDIO8_HEALTH_URL = `http://127.0.0.1:${AUDIO8_DEFAULT_PORT}/v1/models`;
-// 自托管的预下载模型（可选，存到 ~/audio8_models/0.1B/ 下，避免每次 git clone 后再下 572MB）
-const AUDIO8_MODEL_DIR = '~/audio8_models/audio8-TTS-0.1B-ONNX-INT8';
+const AUDIO8_HEALTH_URL = `http://127.0.0.1:${AUDIO8_DEFAULT_PORT}/api/health`;
 
 // 包管理器嗅探（apt/dnf/yum/apk/pacman）
 // 用 which 而非 command -v（Debian/Ubuntu 12+ 的 /bin/sh 没有 command 内建，且 PATH 不一定对）
@@ -205,19 +212,16 @@ function systemInstallCmd(pkgMgr, pkgs) {
 }
 
 function buildSystemdUnit() {
-  // Audio8 onnx_runtime 需要 numpy 2.4.3(需 Python ≥ 3.11),Ubuntu 22.04 默认 3.10
-  // 自动探测 python3.11(PPA/官方包),fallback 到 python3
-  const pyBin = (function(){
-    try { execSync('command -v python3.11 2>/dev/null', { shell: '/bin/bash', stdio: 'pipe' }); return 'python3.11'; }
-    catch (e) { return 'python3'; }
-  })();
   // systemd 不展开 ~，必须用绝对路径(root 下 $HOME=/root)
   const home = (function(){
     try { return execSync('/bin/bash -c "echo $HOME"', { shell: '/bin/bash', stdio: 'pipe', encoding: 'utf8' }).trim() || '/root'; }
     catch (e) { return '/root'; }
   })();
-  const deployDir = AUDIO8_DEPLOY_DIR.replace(/^~/, home);
+  const runtimeDir = path.join(home, 'audio8', AUDIO8_RUNTIME_DIR);
   const venvDir = AUDIO8_VENV_DIR.replace(/^~/, home);
+  // 推理线程数 = CPU 核数(默认 5 在少核机器上严重超订阅,实测 2 核 Celeron:
+  // THREADS=5 要 93s,THREADS=2 只要 37s,2.5 倍差距)
+  const threads = os.cpus().length || 2;
   return `[Unit]
 Description=Audio8 TTS (AdoreMix)
 After=network.target
@@ -225,9 +229,15 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=${deployDir}/onnx_runtime
+WorkingDirectory=${runtimeDir}
 Environment=PATH=${venvDir}/bin:/usr/bin:/bin
-ExecStart=${venvDir}/bin/${pyBin} -m arktts_runtime.service --model-dir ./model --voices-dir ./model/voices --port ${AUDIO8_DEFAULT_PORT}
+Environment=ARKTTS_MODEL_DIR=${runtimeDir}/model
+Environment=ARKTTS_VOICES_DIR=${runtimeDir}/voices
+Environment=ARKTTS_PRECISION=int8
+Environment=ARKTTS_CODEC_PRECISION=fp16
+Environment=ARKTTS_THREADS=${threads}
+# service.py 只定义 FastAPI app,无启动入口,必须用 uvicorn 拉起(python -m arktts_runtime.service 会静默退出)
+ExecStart=${venvDir}/bin/python -m uvicorn arktts_runtime.service:app --host 0.0.0.0 --port ${AUDIO8_DEFAULT_PORT}
 Restart=on-failure
 RestartSec=5
 
@@ -301,7 +311,7 @@ function install(opts) {
     const wd = opts.workdir || process.env.ADOREMIX_WORKDIR || path.join(os.homedir(), '.local', 'share', 'adoremix');
     modelDir = cfg.getConfigValue(wd, 'TTS.audio8_model_dir') || '';
   } catch (e) {}
-  const modelLink = `~/audio8/onnx_runtime/model`;  // Audio8 期望的相对路径
+  const modelLink = `~/audio8/${AUDIO8_RUNTIME_DIR}/model`;  // Audio8 期望的模型目录
   // 如果有预托管模型目录，建软链指向
   if (modelDir) {
     try {
@@ -324,16 +334,16 @@ function install(opts) {
       // 只要目录下只有一个子目录且还看不到 onnx_runtime/,就把子目录内容上提,最多 3 层。
       execSync(`rm -rf ~/audio8 && mkdir -p ~/audio8 && tar xzf "${BUNDLED_TARBALL}" -C ~/audio8 && ` +
         `cd ~/audio8 && for i in 1 2 3; do ` +
-        `[ -f onnx_runtime/requirements.txt ] && break; ` +
+        `[ -f ${AUDIO8_RUNTIME_DIR}/requirements.txt ] && break; ` +
         `single=$(ls -A | wc -l); [ "$single" = "1" ] || break; ` +
         `d=$(ls -A); [ -d "$d" ] || break; ` +
         `mv "$d"/* . 2>/dev/null; mv "$d"/.[!.]* . 2>/dev/null; rmdir "$d" 2>/dev/null || true; ` +
         `done; ls ~/audio8 | head -5`, { stdio: 'inherit', shell: '/bin/bash' });
-      // 平仓后必须能看到 onnx_runtime/requirements.txt,否则视为解压失败
-      const flat = execSync('[ -f ~/audio8/onnx_runtime/requirements.txt ] && echo OK || echo MISSING',
+      // 平仓后必须能看到 runtime 的 requirements.txt,否则视为解压失败
+      const flat = execSync(`[ -f ~/audio8/${AUDIO8_RUNTIME_DIR}/requirements.txt ] && echo OK || echo MISSING`,
         { shell: '/bin/bash', encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
       if (flat === 'OK') cloned = true;
-      else logger.warn('内置 tarball 解压后未找到 onnx_runtime/requirements.txt（目录层级异常）');
+      else logger.warn(`内置 tarball 解压后未找到 ${AUDIO8_RUNTIME_DIR}/requirements.txt（目录层级异常）`);
     } catch (e) {
       logger.warn('内置 tarball 解压失败：' + e.message);
     }
@@ -379,16 +389,16 @@ function install(opts) {
     return 1;
   }
   // 统一校验目录结构(git clone 路径也可能带包装目录)
-  const layoutOk = execSync('[ -f ~/audio8/onnx_runtime/requirements.txt ] && echo OK || echo MISSING',
+  const layoutOk = execSync(`[ -f ~/audio8/${AUDIO8_RUNTIME_DIR}/requirements.txt ] && echo OK || echo MISSING`,
     { shell: '/bin/bash', encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
   if (layoutOk !== 'OK') {
-    logger.error('~/audio8 目录结构异常：未找到 onnx_runtime/requirements.txt（可能多了包装目录）');
+    logger.error(`~/audio8 目录结构异常：未找到 ${AUDIO8_RUNTIME_DIR}/requirements.txt（可能多了包装目录）`);
     logger.log('当前内容: ' + execSync('ls ~/audio8', { shell: '/bin/bash', encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim().replace(/\n/g, ' '));
     return 1;
   }
 
   // venv + pip install（Python 3.11+，numpy 2.4.3 需要）
-  // venv 路径必须与 AUDIO8_VENV_DIR/buildSystemdUnit 一致(~/audio8/onnx_runtime/.venv),
+  // venv 路径必须与 AUDIO8_VENV_DIR/buildSystemdUnit 一致(~/audio8/onnx_runtime_0_1b_int8/.venv),
   // 否则 systemd ExecStart 指向不存在的解释器,服务起不来
   const pyBase = (function(){
     try { execSync('command -v python3.11 2>/dev/null', { shell: '/bin/bash', stdio: 'pipe' }); return 'python3.11'; }
@@ -396,14 +406,13 @@ function install(opts) {
   })();
   const venvDir = AUDIO8_VENV_DIR.replace(/^~/, os.homedir());
   try {
-    logger.log('=== 创建 venv 并安装 Python 依赖（首次需 5-10 分钟下载 torch 等,Python=' + pyBase + '）===');
+    logger.log('=== 创建 venv 并安装 Python 依赖（onnxruntime 等约 100MB,Python=' + pyBase + '）===');
     execSync(`${pyBase} -m venv ${venvDir}`, { stdio: 'inherit', shell: '/bin/bash' });
-    // torch 等大包走清华镜像(国内/公司网下官方 PyPI 常超时),失败再回退官方源。
-    // requirements.txt 缺 tokenizers(Audio8 运行需要),补装。
+    // 大包走清华镜像(国内/公司网下官方 PyPI 常超时),失败再回退官方源。
+    // 0.1B runtime 的 requirements 已含 tokenizers(>=0.20,<0.23) 与 onnxruntime(>=1.22,<1.24) 约束。
     const pipCmd = (idx) =>
       `source ${venvDir}/bin/activate && pip install -U pip --quiet && ` +
-      `pip install -r ~/audio8/onnx_runtime/requirements.txt --quiet ${idx} && ` +
-      `pip install tokenizers --quiet ${idx}`;
+      `pip install -r ~/audio8/${AUDIO8_RUNTIME_DIR}/requirements.txt --quiet ${idx}`;
     try {
       execSync(pipCmd('--index-url https://pypi.tuna.tsinghua.edu.cn/simple'), { stdio: 'inherit', shell: '/bin/bash' });
     } catch (e) {
@@ -427,11 +436,14 @@ function install(opts) {
   }
 
   // 等服务健康（模型单独用 audio8-fetch-model 下载，未下模型时服务起不来是预期）
-  const modelReady = fs.existsSync(path.join(os.homedir(), 'audio8', 'onnx_runtime', 'model', 'runtime_manifest.json'));
-  if (!modelReady) {
-    logger.warn('模型未下载（' + (cloned ? '正常，模型与 install 解耦' : '') + '）: 先执行 adoremix audio8-fetch-model 下载 ~423MB 模型,再 systemctl restart ' + AUDIO8_SYSTEMD_NAME);
+  const modelDirFull = path.join(os.homedir(), 'audio8', AUDIO8_RUNTIME_DIR, 'model');
+  const modelReady = fs.existsSync(path.join(modelDirFull, 'runtime_manifest.json'));
+  if (modelReady) {
+    seedDefaultVoice(modelDirFull);
+  } else {
+    logger.warn('模型未下载（正常，模型与 install 解耦）: 先执行 adoremix audio8-fetch-model 下载 ~423MB 模型,再 systemctl restart ' + AUDIO8_SYSTEMD_NAME);
   }
-  logger.log('=== 等待服务健康（最多 60 秒）===');
+  logger.log('=== 等待服务健康（最多 60 秒，模型冷启动加载约 20-30 秒）===');
   let ok = false;
   for (let i = 1; i <= 30; i++) {
     try {
@@ -444,7 +456,7 @@ function install(opts) {
   }
   if (!ok) {
     logger.warn('60 秒内未就绪: ' + (modelReady ? '请手动 systemctl status ' + AUDIO8_SYSTEMD_NAME : '模型缺失所致,先跑 adoremix audio8-fetch-model'));
-    logger.log('前台排查: cd ~/audio8/onnx_runtime && .venv/bin/' + pyBase + ' -m arktts_runtime.service --model-dir ./model --voices-dir ./model/voices --port ' + AUDIO8_DEFAULT_PORT);
+    logger.log('前台排查: journalctl -u ' + AUDIO8_SYSTEMD_NAME + ' -n 30');
   }
 
   // 改本地 config.ini
@@ -485,7 +497,7 @@ async function status(opts) {
   opts = opts || {};
   const baseUrl = opts.url || process.env.ADOREMIX_AUDIO8_BASE_URL || `http://127.0.0.1:${AUDIO8_DEFAULT_PORT}`;
   try {
-    const urlObj = new URL(`${baseUrl}/v1/models`);
+    const urlObj = new URL(`${baseUrl}/api/health`);
     const lib = urlObj.protocol === 'https:' ? require('https') : require('http');
     await new Promise(resolve => {
       const req = lib.request({ hostname: urlObj.hostname, port: urlObj.port, path: urlObj.pathname, method: 'GET', timeout: 5000 }, res => {
@@ -583,11 +595,41 @@ function downloadTo(url, target, file) {
   });
 }
 
+// Audio8 没有预置音色库——每个音色都要注册(克隆)。但模型自带 reference_codes.npy +
+// manifest.reference_text 就是官方默认参考音的原料,物化成 voices/default/ 即可直接合成。
+// (VoiceStore.load 只认 voices/<name>/{codes.npy,meta.json},meta 只强依赖 reference_text)
+function seedDefaultVoice(modelDir) {
+  try {
+    const voicesDefault = path.join(path.dirname(modelDir), 'voices', 'default');
+    const metaPath = path.join(voicesDefault, 'meta.json');
+    if (fs.existsSync(metaPath)) return true; // 已有默认音色
+    const codesSrc = path.join(modelDir, 'reference_codes.npy');
+    const manifestPath = path.join(modelDir, 'runtime_manifest.json');
+    if (!fs.existsSync(codesSrc) || !fs.existsSync(manifestPath)) return false;
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    if (!manifest.reference_text) return false;
+    fs.mkdirSync(voicesDefault, { recursive: true });
+    fs.copyFileSync(codesSrc, path.join(voicesDefault, 'codes.npy'));
+    fs.writeFileSync(metaPath, JSON.stringify({
+      name: 'default',
+      reference_text: manifest.reference_text,
+      dtype: 'int64',
+      sample_rate: manifest.sample_rate || 44100,
+      source: 'builtin'
+    }), 'utf8');
+    logger.ok('已生成默认音色 default（模型内置参考音）→ ' + voicesDefault);
+    return true;
+  } catch (e) {
+    logger.warn('默认音色生成失败: ' + e.message);
+    return false;
+  }
+}
+
 async function fetchModel(opts) {
   opts = opts || {};
-  // 目标目录必须与 systemd 单元一致(WorkingDirectory=~/audio8/onnx_runtime + --model-dir ./model)
+  // 目标目录必须与 systemd 单元一致(ARKTTS_MODEL_DIR=~/audio8/<runtime>/model)
   const targetDir = process.env.ADOREMIX_AUDIO8_MODEL_DIR
-    || path.join(os.homedir(), 'audio8', 'onnx_runtime', 'model');
+    || path.join(os.homedir(), 'audio8', AUDIO8_RUNTIME_DIR, 'model');
   const baseUrls = opts.url ? [opts.url] : MODEL_DEFAULT_URLS;
   // --registration / ADOREMIX_AUDIO8_WITH_REGISTRATION=1 时追加声音克隆注册子模型(+396MB)
   const files = (opts.registration || process.env.ADOREMIX_AUDIO8_WITH_REGISTRATION === '1')
@@ -625,6 +667,7 @@ async function fetchModel(opts) {
     return 1;
   }
   logger.ok(`Audio8 模型就绪（${ok} 个文件）: ${targetDir}`);
+  seedDefaultVoice(targetDir);
   logger.log('重启服务生效: systemctl restart audio8-tts');
   return 0;
 }

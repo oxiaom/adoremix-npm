@@ -512,7 +512,7 @@ function buildProgram() {
 
   audio8
     .command('fetch-model [url]')
-    .description('单独下载 Audio8 TTS 模型（核心 ~423MB）到 ~/audio8/onnx_runtime/model/，与 audio8 install 解耦避免 install 卡住')
+    .description('单独下载 Audio8 TTS 模型（核心 ~423MB）到 ~/audio8/onnx_runtime_0_1b_int8/model/，与 audio8 install 解耦避免 install 卡住')
     .option('--registration', '同时下载声音克隆注册子模型（约 +396MB，基础 TTS 不需要）')
     .action(async (url, opts) => {
       const mod = require('../tts/providers/audio8');
