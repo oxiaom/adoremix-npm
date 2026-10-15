@@ -512,11 +512,12 @@ function buildProgram() {
 
   audio8
     .command('fetch-model [url]')
-    .description('单独下载 Audio8 TTS 模型（572MB 0.1B INT8）到 /root/audio8/model/，与 audio8 install 解耦避免 install 卡住')
-    .action(async (url) => {
+    .description('单独下载 Audio8 TTS 模型（核心 ~423MB）到 ~/audio8/onnx_runtime/model/，与 audio8 install 解耦避免 install 卡住')
+    .option('--registration', '同时下载声音克隆注册子模型（约 +396MB，基础 TTS 不需要）')
+    .action(async (url, opts) => {
       const mod = require('../tts/providers/audio8');
       try {
-        process.exitCode = await mod.fetchModel({ url });
+        process.exitCode = await mod.fetchModel({ url, registration: !!opts.registration });
       } catch (e) {
         logger.error(e.message);
         process.exitCode = 1;
@@ -527,10 +528,11 @@ function buildProgram() {
   program
     .command('audio8-fetch-model [url]')
     .description('下载 Audio8 TTS 模型（单独使用，不依赖 audio8 install）')
-    .action(async (url) => {
+    .option('--registration', '同时下载声音克隆注册子模型（约 +396MB，基础 TTS 不需要）')
+    .action(async (url, opts) => {
       const mod = require('../tts/providers/audio8');
       try {
-        process.exitCode = await mod.fetchModel({ url });
+        process.exitCode = await mod.fetchModel({ url, registration: !!opts.registration });
       } catch (e) {
         logger.error(e.message);
         process.exitCode = 1;

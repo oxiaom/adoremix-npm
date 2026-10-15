@@ -471,66 +471,121 @@ async function status(opts) {
   }
 }
 
-module.exports = { synthesize, checkDeps, VOICES, DEFAULT_BASE_URL, install, uninstall, status, fetchModel };
+module.exports = { synthesize, checkDeps, VOICES, DEFAULT_BASE_URL, install, uninstall, status, fetchModel, downloadTo };
 
 // === fetchModel: 单独下载 Audio8 TTS 模型 ===
-// 默认 URL:HuggingFace 0.1B INT8(~572MB,公司网差可改为自家 OSS 链接)
-const MODEL_DEFAULT_URL = process.env.ADOREMIX_AUDIO8_MODEL_URL
-  || 'https://huggingface.co/Audio8/audio8-TTS-0.1B-ONNX-INT8/resolve/main/';
-// 模型要的所有文件(必须下完整,Audio8 启动会校验)
+// 源优先级:环境变量/参数指定 > hf-mirror.com(国内可达) > huggingface.co(官方,国内常被墙)
+// 自托管:把 6 个文件传到自己服务器后 ADOREMIX_AUDIO8_MODEL_URL=https://your-host/xxx/ 或
+//        adoremix audio8-fetch-model https://your-host/xxx/
+const MODEL_DEFAULT_URLS = process.env.ADOREMIX_AUDIO8_MODEL_URL
+  ? [process.env.ADOREMIX_AUDIO8_MODEL_URL]
+  : [
+      'https://hf-mirror.com/Audio8/audio8-TTS-0.1B-ONNX-INT8/resolve/main/',
+      'https://huggingface.co/Audio8/audio8-TTS-0.1B-ONNX-INT8/resolve/main/'
+    ];
+// 模型文件清单（以仓库 runtime_manifest.json 为准,2026-10 核对）
+// 核心运行文件 ~423MB;registration/ 子目录是声音克隆注册子模型(+396MB),基础 TTS 不需要
 const MODEL_FILES = [
-  'config.json', 'tokenizer.json', 'tokenizer_config.json', 'special_tokens_map.json',
-  'model.onnx', 'model.onnx.data'
+  'runtime_manifest.json',
+  'config.json',
+  'reference_codes.npy',
+  'codec_decoder_fp16.onnx',
+  'codec_decoder_fp16.onnx.data',
+  'slow_ar_int8.onnx',
+  'slow_ar_int8.onnx.data',
+  'fast_ar_int8.onnx',
+  'fast_ar_int8.onnx.data',
+  'tokenizer/tokenizer.json'
+];
+const MODEL_REGISTRATION_FILES = [
+  'registration/registration_manifest.json',
+  'registration/codec_encoder_fp16.onnx',
+  'registration/codec_encoder_fp16.onnx.data'
 ];
 
-async function downloadOne(baseUrl, file, targetDir, log) {
-  const url = baseUrl.replace(/\/$/, '') + '/' + file;
-  const target = path.join(targetDir, file);
+// 下载单文件到 target。HF 风格 /resolve/ 会 301/302/307/308 跳 CDN,
+// Node 的 http.get 不自动跟随重定向,必须手动跳(最多 5 跳)。
+function downloadTo(url, target, file) {
   return new Promise((resolve, reject) => {
-    const lib = url.startsWith('https:') ? require('https') : require('http');
-    const req = lib.get(url, response => {
-      if (response.statusCode !== 200) {
-        response.resume();
-        return reject(new Error(file + ' HTTP ' + response.statusCode));
-      }
-      const ws = require('fs').createWriteStream(target);
-      response.pipe(ws);
-      ws.on('finish', () => ws.close(() => resolve(file)));
-      ws.on('error', reject);
-    });
-    req.on('error', reject);
-    req.setTimeout(600000, () => req.destroy(new Error(file + ' timeout (10min)')));
+    const get = (u, hops) => {
+      if (hops > 5) return reject(new Error(file + ' 重定向超过 5 跳'));
+      const lib = u.startsWith('https:') ? https : http;
+      const req = lib.get(u, response => {
+        if ([301, 302, 303, 307, 308].indexOf(response.statusCode) >= 0) {
+          const loc = response.headers.location;
+          response.resume();
+          if (!loc) return reject(new Error(file + ' 重定向缺少 Location'));
+          return get(new URL(loc, u).href, hops + 1);
+        }
+        if (response.statusCode !== 200) {
+          response.resume();
+          return reject(new Error('HTTP ' + response.statusCode));
+        }
+        const total = parseInt(response.headers['content-length'] || '0', 10);
+        const ws = fs.createWriteStream(target);
+        let got = 0, lastLog = 0;
+        response.on('data', c => {
+          got += c.length;
+          // 大文件(model.onnx.data ~572MB)每 100MB 报一次进度,避免长时间无输出像卡死
+          if (got - lastLog >= 100 * 1024 * 1024) {
+            lastLog = got;
+            logger.log(`    ${file}: ${(got / 1048576).toFixed(0)}MB` + (total ? ` / ${(total / 1048576).toFixed(0)}MB` : ''));
+          }
+        });
+        response.pipe(ws);
+        ws.on('finish', () => ws.close(() => resolve({ file, got, total })));
+        ws.on('error', reject);
+      });
+      req.on('error', reject);
+      // 10 分钟超时:572MB 在 ≥1MB/s 的链路上够用
+      req.setTimeout(600000, () => req.destroy(new Error(file + ' 超时(10min)')));
+    };
+    get(url, 0);
   });
 }
 
 async function fetchModel(opts) {
   opts = opts || {};
-  const targetDir = process.env.ADOREMIX_AUDIO8_MODEL_DIR || '/root/audio8/model';
-  const baseUrl = opts.url || MODEL_DEFAULT_URL;
-  const log = (m) => console.log(m);
+  // 目标目录必须与 systemd 单元一致(WorkingDirectory=~/audio8/onnx_runtime + --model-dir ./model)
+  const targetDir = process.env.ADOREMIX_AUDIO8_MODEL_DIR
+    || path.join(os.homedir(), 'audio8', 'onnx_runtime', 'model');
+  const baseUrls = opts.url ? [opts.url] : MODEL_DEFAULT_URLS;
+  // --registration / ADOREMIX_AUDIO8_WITH_REGISTRATION=1 时追加声音克隆注册子模型(+396MB)
+  const files = (opts.registration || process.env.ADOREMIX_AUDIO8_WITH_REGISTRATION === '1')
+    ? MODEL_FILES.concat(MODEL_REGISTRATION_FILES) : MODEL_FILES;
 
-  log('Audio8 模型下载 → ' + targetDir);
-  log('源 URL: ' + baseUrl);
-  if (!baseUrl.endsWith('/') && !baseUrl.includes('resolve/main')) {
-    log('  (URL 应以 /resolve/main/ 结尾,自动补)');
-  }
-  require('fs').mkdirSync(targetDir, { recursive: true });
+  logger.log('Audio8 模型下载 → ' + targetDir);
+  fs.mkdirSync(targetDir, { recursive: true });
 
   let ok = 0, fail = 0;
-  for (const f of MODEL_FILES) {
-    try {
-      log('  → ' + f + ' ...');
-      await downloadOne(baseUrl, targetDir, f, log);
-      ok++;
-    } catch (e) {
-      log('  ✗ ' + f + ' 失败: ' + e.message);
+  for (const f of files) {
+    let done = false, lastErr = null;
+    // 文件清单含子目录(如 tokenizer/tokenizer.json),先建父目录
+    const target = path.join(targetDir, f);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    for (const base of baseUrls) {
+      try {
+        logger.log(`  → ${f}（源 ${new URL(base).host}）`);
+        const r = await downloadTo(base.replace(/\/+$/, '') + '/' + f, target, f);
+        logger.log(`    ✓ ${f} 完成 ${(r.got / 1048576).toFixed(1)}MB`);
+        done = true;
+        break;
+      } catch (e) {
+        lastErr = e;
+        logger.warn(`    ✗ 源 ${new URL(base).host} 失败: ${e.message}`);
+      }
+    }
+    if (done) { ok++; }
+    else {
       fail++;
+      logger.error(`  ✗ ${f} 所有源均失败: ${lastErr ? lastErr.message : '未知错误'}`);
     }
   }
   if (fail > 0) {
-    log('失败 ' + fail + ' 个,模型可能不完整(重启 Audio8 会报错)');
+    logger.error(`失败 ${fail} 个文件,模型不完整。可换源自试: adoremix audio8-fetch-model <url>/`);
     return 1;
   }
-  log('✓ Audio8 模型就绪(' + ok + ' 个文件):' + targetDir);
+  logger.ok(`Audio8 模型就绪（${ok} 个文件）: ${targetDir}`);
+  logger.log('重启服务生效: systemctl restart audio8-tts');
   return 0;
 }
