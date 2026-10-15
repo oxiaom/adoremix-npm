@@ -509,41 +509,54 @@ adoremix config-manager status       # 查看状态
 - 需 root + python3；Flask 缺失时自动 `python3 -m pip install flask`
 - 修改的 `config.ini` 指向 AdoreMix 工作目录（`ADOREMIX_WORKDIR` 环境变量）
 
-### Audio8 TTS（本地流式 TTS，自动安装）
+### Audio8 TTS（本地离线 TTS，自动安装）
 
-基于 [Audio8-AI/Audio8_TTS](https://github.com/Audio8-AI/Audio8_TTS)（0.1B 参数、Apache 2.0、支持中文）。在本机（Linux）执行安装，自动 git clone + 创建 venv + 装依赖 + 起 systemd 服务，本地 config.ini 自动切到 `provider=audio8`。**Windows/macOS 不支持**(依赖 systemd)，需在 Linux 主机上跑。
+基于 [Audio8-AI/Audio8_TTS](https://github.com/Audio8-AI/Audio8_TTS)（0.1B 参数、Apache 2.0、支持中文，0.1B INT8 ONNX CPU 推理）。在本机（Linux）执行安装，自动解包源码 + 创建 venv + 装依赖 + 起 systemd 服务。**Windows/macOS 不支持**（依赖 systemd），需在 Linux 主机上跑。
 
 ```bash
-adoremix audio8 install           # 在本机装（检测 apt/dnf/yum/apk/pacman，自动适配）
-adoremix audio8 status            # 健康检查（GET /v1/models）
-adoremix audio8 uninstall         # 卸载
+# 1. 装运行时（源码内置离线 tarball + venv + systemd，几分钟）
+adoremix audio8 install
+
+# 2. 下模型（核心 ~423MB，默认走 hf-mirror.com 国内可达；自动生成默认音色）
+adoremix audio8-fetch-model
+
+# 3. 重启生效 + 检查
+systemctl restart audio8-tts
+adoremix audio8 status            # 健康检查（GET /api/health）
+
+# 卸载
+adoremix audio8 uninstall
 ```
 
-- 部署后访问：`http://127.0.0.1:8024/docs`
-- 端口：**8024**（Audio8 默认）
-- 首次启动自动从 HuggingFace 下载 ~572MB 模型（0.1B-INT8），等 1-3 分钟
-- 要求：本机 Linux 有 `python3 + git + ffmpeg`，至少 1GB RAM
-- 适配的发行版：Debian/Ubuntu（apt）、RHEL/CentOS/AlmaLinux（dnf/yum）、Alpine（apk）、Arch（pacman）
-- 自动写 systemd unit（`/etc/systemd/system/audio8-tts.service`）并 enable + start
-- 修改本地 config.ini：`[TTS] provider=audio8, audio8_base_url=http://127.0.0.1:8024`
+- 端口：**8024**；健康检查 `GET /api/health`；API 文档 `http://127.0.0.1:8024/docs`
+- 模型源默认 `hf-mirror.com`（国内可达）→ `huggingface.co` 兜底，单文件自动切换
+- **自托管模型**：把模型 10 个文件放到自己服务器后 `adoremix audio8-fetch-model https://你的域名/模型目录/`，或设环境变量 `ADOREMIX_AUDIO8_MODEL_URL`（模型数据文件全平台通用）
+- 模型目录：`~/audio8/onnx_runtime_0_1b_int8/model/`（与 systemd 单元一致，勿手工挪动）
+- **默认音色**：Audio8 无预置音色库，fetch-model 会自动把模型内置参考音物化为 `default` 音色，开箱即用
+- **声音克隆**（可选）：0.5~30 秒参考音频 + 转写文本，`POST /api/voices/register`；需额外下载注册子模型（+396MB）：`adoremix audio8-fetch-model --registration`
+- 服务端返回 WAV，AdoreMix 自动用 ffmpeg 转 MP3 推给设备（ffmpeg 必需）
+- 推理线程数按 CPU 核数自动设置（`ARKTTS_THREADS`）
+- 适配发行版：Debian/Ubuntu（apt）、RHEL/CentOS/AlmaLinux（dnf/yum）、Alpine（apk）、Arch（pacman）
+- 内存占用：模型加载后约 1.8GB，建议 ≥3GB RAM 的机器安装
+- install 结束自动写本地 config.ini：`[TTS] provider=audio8, audio8_base_url=http://127.0.0.1:8024`
 
-### ⚠️ 已知限制(2026-08 端到端测试发现)
+### ⚠️ 性能实测（2026-10，114 干净机器端到端验证）
 
-- **网络受限/慢机器上 Audio8 install 不可用**:114(ubuntu 22.04 + 3.7G RAM + 公司限速网络)实测,
-  1. 装 venv 依赖 OK(numpy/onnxruntime/fastapi/tokenizers 都能用清华源装)
-  2. `pip install torch` 装上(~800MB,带 CUDA 13)
-  3. **但下 572MB 模型卡死**:HuggingFace `audio8-TTS-0.1B-ONNX-INT8` 模型 download 几十分钟完不成
-  4. **Audio8 服务要求模型目录**:`/root/audio8/model/`(或 `ARKTTS_MODEL_DIR` 环境变量)必须存在
-- **自托管方案**(适合公司内部):用 `adoremix audio8 install` 装好后,
-  从能下到模型的机器(开发机/有公网)用 `huggingface-cli download Audio8/audio8-TTS-0.1B-ONNX-INT8 --local-dir /tmp/audio8-model`,
-  然后 `scp -r /tmp/audio8-model/* root@<目标机>:/root/audio8/model/`,
-  124 上 `systemctl restart audio8-tts` 即可。
-- **国产 Linux 跑 Audio8 没测试过**,理论上支持(只要 Linux + python3.11 + ≥1GB RAM)
+CPU int8 推理速度取决于 CPU 核数与单核性能：
+
+| 硬件 | 实测 | 结论 |
+|---|---|---|
+| 2 核 Celeron G4900 @3.1GHz | 生成 1 秒音频约需 15 秒（RTF≈15×） | 定时广播预生成可用，实时喊话不建议 |
+| 4 核及以上现代 CPU | 预计 RTF 3~6× | 定时广播流畅，短句接近可用 |
+
+- 全链路已实测通过：install → fetch-model → 默认音色 → 合成 MP3（含 WAV→MP3 转码）
+- 冷启动加载模型约 20~30 秒；长文本按比例耗时，建议广播文本控制在 100 字内
+- 弱 CPU 机器建议：定时广播提前生成，或继续用 xf（讯飞）/edge（微软云）云端 TTS
 
 ### 多机部署方案
-- 114(3.7G RAM,Ubuntu 22.04):**推荐装 Audio8**(内存富余),但需确认网络能下 572MB 模型
-- 123(4G RAM,RK3528 arm64):AdoreMix 主程序跑,**不装 Audio8**,通过 `config.ini` 远程调 114 的 `http://192.168.1.114:8024`
-- **如果所有机器都装不上 Audio8**(网络/资源限制),全部用默认的 xf(讯飞) 或 edge(微软云) TTS,这俩不需要本地模型
+- 内存 ≥3GB 的 Linux 主机：本机装 Audio8（全离线，不依赖云 TTS）
+- 小内存/弱 CPU 机器（如 ARM 盒子）：不装 Audio8，`config.ini` 的 `audio8_base_url` 指向局域网内已装的 Audio8 机器（如 `http://192.168.1.114:8024`）
+- 都不装时用默认的 xf（讯飞）或 edge（微软云）TTS，无需本地模型
 
 ---
 

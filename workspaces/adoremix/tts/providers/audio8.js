@@ -303,13 +303,15 @@ function install(opts) {
     return 1;
   }
 
+  // config 工作目录:与 adoremix 其余命令同源(root Linux 下是 /opt/adoremix,不是 ~/.local/share)
+  const pathsMod = require(path.join(__dirname, '..', '..', 'src', 'paths'));
+  const configWorkdir = () => opts.workdir || process.env.ADOREMIX_WORKDIR || pathsMod.defaultWorkdir();
+
   // 检查 config.ini 是否有预托管模型（audio8_model_dir）
   let modelDir = '';
   try {
-    // 从主包内置 src/config 读取（避免 tts/src/config 这种错误路径）
     const cfg = require(path.join(__dirname, '..', '..', 'src', 'config'));
-    const wd = opts.workdir || process.env.ADOREMIX_WORKDIR || path.join(os.homedir(), '.local', 'share', 'adoremix');
-    modelDir = cfg.getConfigValue(wd, 'TTS.audio8_model_dir') || '';
+    modelDir = cfg.getConfigValue(configWorkdir(), 'TTS.audio8_model_dir') || '';
   } catch (e) {}
   const modelLink = `~/audio8/${AUDIO8_RUNTIME_DIR}/model`;  // Audio8 期望的模型目录
   // 如果有预托管模型目录，建软链指向
@@ -459,13 +461,13 @@ function install(opts) {
     logger.log('前台排查: journalctl -u ' + AUDIO8_SYSTEMD_NAME + ' -n 30');
   }
 
-  // 改本地 config.ini
+  // 改本地 config.ini(tts/providers/ → 主包 src/config 要退两级)
   try {
-    const cfg = require(path.join(__dirname, '..', 'src', 'config'));
-    const wd = opts.workdir || process.env.ADOREMIX_WORKDIR || path.join(os.homedir(), '.local', 'share', 'adoremix');
+    const cfg = require(path.join(__dirname, '..', '..', 'src', 'config'));
+    const wd = configWorkdir();
     cfg.setConfigValue(wd, 'TTS.provider', 'audio8');
     cfg.setConfigValue(wd, 'TTS.audio8_base_url', `http://127.0.0.1:${AUDIO8_DEFAULT_PORT}`);
-    logger.ok(`config.ini 已更新: provider=audio8, audio8_base_url=http://127.0.0.1:${AUDIO8_DEFAULT_PORT}`);
+    logger.ok(`config.ini 已更新(${wd}): provider=audio8, audio8_base_url=http://127.0.0.1:${AUDIO8_DEFAULT_PORT}`);
   } catch (e) {
     logger.warn('config.ini 更新失败: ' + e.message);
   }
@@ -502,7 +504,7 @@ async function status(opts) {
     await new Promise(resolve => {
       const req = lib.request({ hostname: urlObj.hostname, port: urlObj.port, path: urlObj.pathname, method: 'GET', timeout: 5000 }, res => {
         if (res.statusCode === 200) {
-          logger.ok(`Audio8 服务健康: ${baseUrl}/v1/models 返回 ${res.statusCode}`);
+          logger.ok(`Audio8 服务健康: ${baseUrl}/api/health 返回 ${res.statusCode}`);
           res.resume();
           resolve(0);
         } else {
