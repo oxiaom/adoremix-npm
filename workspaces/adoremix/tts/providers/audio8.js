@@ -313,16 +313,11 @@ function install(opts) {
     const cfg = require(path.join(__dirname, '..', '..', 'src', 'config'));
     modelDir = cfg.getConfigValue(configWorkdir(), 'TTS.audio8_model_dir') || '';
   } catch (e) {}
-  const modelLink = `~/audio8/${AUDIO8_RUNTIME_DIR}/model`;  // Audio8 期望的模型目录
-  // 如果有预托管模型目录，建软链指向
-  if (modelDir) {
-    try {
-      logger.log('=== 链接预托管模型 ' + modelDir + ' → ' + modelLink + ' ===');
-      execSync(`mkdir -p $(dirname ${modelLink}) && rm -rf ${modelLink} && ln -s ${modelDir} ${modelLink}`, { stdio: 'inherit', shell: '/bin/bash' });
-    } catch (e) {
-      logger.warn('链接模型失败: ' + e.message);
-    }
-  }
+  const modelLink = `~/audio8/${AUDIO8_RUNTIME_DIR}/model`;  // Audio8 期望的模型目录(软链在源码就位后建)
+  // 重装保护:已有 model/voices(423MB+)先挪 /tmp 暂存,源码解压后还原——重跑 install 不用重新下模型
+  execSync(`rm -rf /tmp/audio8-keep && mkdir -p /tmp/audio8-keep; ` +
+    `for d in model voices; do if [ -e ~/audio8/${AUDIO8_RUNTIME_DIR}/$d ]; then mv ~/audio8/${AUDIO8_RUNTIME_DIR}/$d /tmp/audio8-keep/$d; fi; done; true`,
+    { stdio: 'pipe', shell: '/bin/bash' });
 
   // 拉 Audio8_TTS 源码：先试内置 tarball（主包 audio8-assets/audio8-tts.tgz，离线），再 git 镜像，最后 codeload
   let cloned = false;
@@ -397,6 +392,19 @@ function install(opts) {
     logger.error(`~/audio8 目录结构异常：未找到 ${AUDIO8_RUNTIME_DIR}/requirements.txt（可能多了包装目录）`);
     logger.log('当前内容: ' + execSync('ls ~/audio8', { shell: '/bin/bash', encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim().replace(/\n/g, ' '));
     return 1;
+  }
+  // 还原暂存的 model/voices(重装保护的后半段;新装机没有暂存则跳过)
+  execSync(`for d in model voices; do if [ -e /tmp/audio8-keep/$d ]; then mkdir -p ~/audio8/${AUDIO8_RUNTIME_DIR}; mv /tmp/audio8-keep/$d ~/audio8/${AUDIO8_RUNTIME_DIR}/$d; fi; done; rm -rf /tmp/audio8-keep; true`,
+    { stdio: 'pipe', shell: '/bin/bash' });
+
+  // config 配了预托管模型目录(audio8_model_dir)则软链覆盖(优先级高于还原的模型)
+  if (modelDir) {
+    try {
+      logger.log('=== 链接预托管模型 ' + modelDir + ' → ' + modelLink + ' ===');
+      execSync(`mkdir -p $(dirname ${modelLink}) && rm -rf ${modelLink} && ln -s ${modelDir} ${modelLink}`, { stdio: 'inherit', shell: '/bin/bash' });
+    } catch (e) {
+      logger.warn('链接模型失败: ' + e.message);
+    }
   }
 
   // venv + pip install（Python 3.11+，numpy 2.4.3 需要）
