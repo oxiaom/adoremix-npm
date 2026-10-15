@@ -55,11 +55,11 @@ const PROVIDER_DEPENDENCIES = {
     nodeModules: [],         // 用 Node 内置 http/https
     creds: [],                // 本地服务无 API key
     systemPkgs: [
-      { name: 'ffmpeg', cmd: 'ffmpeg' }   // 转码用（实际 audio8 直接返回 mp3 不用 ffmpeg，但保留 fallback）
+      { name: 'ffmpeg', cmd: 'ffmpeg' }   // Audio8 服务端只返回 WAV,provider 层必须 ffmpeg 转 mp3
     ],
     pipPkgs: [],              // 纯 HTTP 调用，无 Python 依赖
     executables: [...TRANSCODE_TOOLS],
-    // 额外：需要本地 Audio8 TTS 服务可达（检查时探测 /v1/models）
+    // 额外：需要 Audio8 TTS 服务可达（checkDeps 末尾同步探测 /api/health）
     extraChecks: ['http_endpoint']
   }
 };
@@ -241,37 +241,23 @@ function checkDeps(workdir, providerName, cfg) {
     });
   }
 
-  // audio8：探测本地服务可达性（GET /v1/models，超时 3 秒）
+  // audio8：探测本地服务可达性（GET /api/health，超时 3 秒，同步等待结果）
   if (providerName === 'audio8') {
-    const http = require('http');
-    const https = require('https');
-    const url = require('url');
-    const audio8BaseUrl = (cfg && cfg.TTS && cfg.TTS.audio8_base_url) || 'http://127.0.0.1:7860';
+    const audio8BaseUrl = (cfg && cfg.TTS && cfg.TTS.audio8_base_url) || 'http://127.0.0.1:8024';
     let u;
     try { u = new URL(audio8BaseUrl); } catch (e) {
-      issues.push({ severity: 'error', category: 'service', msg: `audio8_base_url 无效: ${audio8BaseUrl}（需 config.ini [TTS] audio8_base_url 配置，如 http://127.0.0.1:7860）`, autoFixable: false });
+      issues.push({ severity: 'error', category: 'service', msg: `audio8_base_url 无效: ${audio8BaseUrl}（需 config.ini [TTS] audio8_base_url 配置，如 http://127.0.0.1:8024）`, autoFixable: false });
     }
     if (u) {
       try {
-        const lib = u.protocol === 'https:' ? https : http;
-        const req = lib.request({
-          hostname: u.hostname,
-          port: u.port || (u.protocol === 'https:' ? 443 : 80),
-          path: '/v1/models',
-          method: 'GET',
-          timeout: 3000
-        }, res => {
-          if (res.statusCode !== 200) {
-            issues.push({ severity: 'error', category: 'service', msg: `Audio8 服务不可达：${audio8BaseUrl} 返回 HTTP ${res.statusCode}`, autoFixable: false });
-          }
-        });
-        req.on('error', err => {
-          issues.push({ severity: 'error', category: 'service', msg: `Audio8 服务不可达（${audio8BaseUrl}）：${err.message}。请确认 Audio8 TTS 服务已启动（参考 Audio8-AI/Audio8_TTS），并在 config.ini [TTS] audio8_base_url 配置正确地址。`, autoFixable: false });
-        });
-        req.on('timeout', () => { req.destroy(); issues.push({ severity: 'error', category: 'service', msg: `Audio8 服务超时（${audio8BaseUrl}/v1/models 3s 无响应）`, autoFixable: false }); });
-        req.end();
+        // http 回调是异步的,直接 push issue 会丢——用 execSync curl 同步探测
+        const out = execSync(`curl -s -o /dev/null -w "%{http_code}" --max-time 3 "${audio8BaseUrl.replace(/\/+$/, '')}/api/health"`,
+          { shell: '/bin/bash', encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+        if (out !== '200') {
+          issues.push({ severity: 'error', category: 'service', msg: `Audio8 服务异常：${audio8BaseUrl}/api/health 返回 HTTP ${out}。检查 systemctl status audio8-tts（本机部署时）或确认 audio8_base_url 指向的远程服务可达。`, autoFixable: false });
+        }
       } catch (e) {
-        issues.push({ severity: 'error', category: 'service', msg: `audio8 服务探测失败：${e.message}`, autoFixable: false });
+        issues.push({ severity: 'error', category: 'service', msg: `Audio8 服务不可达（${audio8BaseUrl}）：${String(e.message).split('\n')[0]}。本机部署用 systemctl restart audio8-tts 拉起；远程部署确认网络可达。`, autoFixable: false });
       }
     }
   }

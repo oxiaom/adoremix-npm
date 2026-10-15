@@ -439,6 +439,18 @@ function runDoctor(workdir, opts) {
     }
   }
 
+  // 9. Audio8 本机部署体检（Linux + 本机装了 audio8 或 provider=audio8 且指向本机时）
+  if (process.platform === 'linux') {
+    const a8 = require('./doctor-audio8');
+    const audio8BaseUrl = (cfgObj.TTS && cfgObj.TTS.audio8_base_url) || 'http://127.0.0.1:8024';
+    const isLocalProvider = providerName === 'audio8' && /^https?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(audio8BaseUrl);
+    if (isLocalProvider || a8.isInstalled()) {
+      logger.log('');
+      logger.log('=== Audio8 本机部署检查 ===');
+      a8.checkAudio8Deployment(issues, { fix: !!opts.fix, providerActive: isLocalProvider });
+    }
+  }
+
   return reportAndExit(issues, opts);
 }
 
