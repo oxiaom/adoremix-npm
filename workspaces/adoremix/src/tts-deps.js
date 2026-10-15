@@ -249,20 +249,44 @@ function checkDeps(workdir, providerName, cfg) {
       issues.push({ severity: 'error', category: 'service', msg: `audio8_base_url 无效: ${audio8BaseUrl}（需 config.ini [TTS] audio8_base_url 配置，如 http://127.0.0.1:8024）`, autoFixable: false });
     }
     if (u) {
-      try {
-        // http 回调是异步的,直接 push issue 会丢——用 execSync curl 同步探测
-        const out = execSync(`curl -s -o /dev/null -w "%{http_code}" --max-time 3 "${audio8BaseUrl.replace(/\/+$/, '')}/api/health"`,
-          { shell: '/bin/bash', encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
-        if (out !== '200') {
-          issues.push({ severity: 'error', category: 'service', msg: `Audio8 服务异常：${audio8BaseUrl}/api/health 返回 HTTP ${out}。检查 systemctl status audio8-tts（本机部署时）或确认 audio8_base_url 指向的远程服务可达。`, autoFixable: false });
-        }
-      } catch (e) {
-        issues.push({ severity: 'error', category: 'service', msg: `Audio8 服务不可达（${audio8BaseUrl}）：${String(e.message).split('\n')[0]}。本机部署用 systemctl restart audio8-tts 拉起；远程部署确认网络可达。`, autoFixable: false });
+      // 同步 HTTP 探测(不能 execSync curl: Windows 无 curl/bash;也不能 async 回调:
+      // checkDeps 是同步函数,回调里的 push 会丢)。spawn curl 带平台回退。
+      const statusCode = httpStatusSync(u, '/api/health', 3000);
+      if (statusCode === -1) {
+        // 平台无任何 HTTP 探测工具,跳过(不阻断安装)
+      } else if (statusCode !== 200) {
+        const detail = statusCode === null
+          ? '无响应/连接失败'
+          : `HTTP ${statusCode}`;
+        issues.push({ severity: 'error', category: 'service', msg: `Audio8 服务不可达（${audio8BaseUrl}）：${detail}。本机部署用 systemctl restart audio8-tts 拉起；远程部署确认网络可达。`, autoFixable: false });
       }
     }
   }
 
   return { issues, provider: providerName };
+}
+
+// 同步获取 HTTP 状态码:优先 curl(Linux/macOS),Windows 用 powershell,都没有回退 node 子进程。
+function httpStatusSync(u, healthPath, timeoutMs) {
+  const url = u.href.replace(/\/+$/, '') + healthPath;
+  // 1) curl
+  try {
+    const out = execSync(`curl -s -o /dev/null -w "%{http_code}" --max-time ${Math.ceil(timeoutMs / 1000)} "${url}"`,
+      { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }).trim();
+    if (/^\d+$/.test(out)) return parseInt(out, 10);
+  } catch (e) { /* 无 curl 或请求失败,继续 */ }
+  // 2) Windows powershell
+  if (process.platform === 'win32') {
+    try {
+      const ps = `$r=try{(Invoke-WebRequest -Uri '${url}' -TimeoutSec ${Math.ceil(timeoutMs / 1000)} -UseBasicParsing).StatusCode}catch{if($_.Exception.Response){[int]$_.Exception.Response.StatusCode}else{0}}; $r`;
+      const out = execSync(`powershell -NoProfile -Command "${ps}"`,
+        { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true }).trim();
+      const n = parseInt(out, 10);
+      return isNaN(n) || n === 0 ? null : n;
+    } catch (e) { return null; }
+  }
+  // 3) 无工具可用(Linux 无 curl 极少见): 返回 null 视为未知,不误报也不放行真故障
+  return -1;
 }
 
 /**
