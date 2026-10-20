@@ -706,17 +706,47 @@ adoremix config init --force               # 重生成默认配置
 ### 升级
 
 ```bash
-# 升级 npm 包
-npm update -g @oxiaom/adoremix
+# 1. 升级主包（务必用官方源：npmmirror 子包同步有延迟）
+npm install -g @oxiaom/adoremix@latest --registry https://registry.npmjs.org
 
-# 重新部署（保留 config.ini 和用户数据）
+# 2. 检查版本一致性（主包与平台子包必须是同一版本）
+adoremix version
+```
+
+如果 `adoremix version` 提示「平台子包版本不一致」（例如主包 1.0.67、子包 1.0.64），说明 npm 复用了缓存的旧子包：
+
+```bash
+# 一键修复（按主包版本用官方源重装子包）
+adoremix doctor --fix
+
+# 或手动指定子包版本（Linux x64 示例，其他平台换成对应子包名）
+npm install -g @oxiaom/adoremix@1.0.67 @oxiaom/adoremix-linux-x64@1.0.67 \
+  --registry https://registry.npmjs.org --prefer-online --force
+```
+
+然后刷新工作目录里的二进制和资源：
+
+```bash
+# 覆盖二进制/资源，config.ini、.Adore.db、docroot 媒体文件都会保留
 adoremix install --force
 
-# 重启
+# 重启主服务（systemd 托管时自动走 systemctl）
 adoremix restart
+
+# 选装组件按需重启（代码随主包升级，重启即生效）
+systemctl restart adoremix-mp3server   # 装了 MP3Server
+systemctl restart audio8-tts          # 装了 Audio8
+systemctl restart nginx               # 装了 nginx 加速
+
+# 最终体检
+adoremix doctor
 ```
 
 `--force` 会覆盖二进制和资源，但**不会覆盖 config.ini**（已存在时保留）。
+
+平台子包名对照：`@oxiaom/adoremix-win32-x64`、`-linux-x64`、`-linux-arm64`、`-linux-arm`、`-darwin-arm64`。
+
+> 回滚到指定版本：把上面命令里的 `@latest` 换成 `@1.0.60` 即可，同样需要 `adoremix install --force` 刷新工作目录。
 
 ### 卸载
 
