@@ -92,6 +92,8 @@ function startServer(opts) {
     let fd = null;
     let audioStart = 0;
     let fileSize = 0;
+    let totalSize = 0;
+    let offset = 0;
     let filePath = '';
     let state = 'path';             // path → chunks
     let pending = Buffer.alloc(0);
@@ -128,7 +130,9 @@ function startServer(opts) {
           return fail('Invalid MP3 file format');
         }
         filePath = line;
+        totalSize = st.size;
         fileSize = st.size - audioStart;
+        offset = audioStart;
         state = 'chunks';
         log(`[info] ${peer} 推送 ${line} 起始=${audioStart} 大小=${fileSize}`);
         sock.write(String(fileSize) + '\n');
@@ -147,7 +151,7 @@ function startServer(opts) {
 
       const buf = Buffer.alloc(n);
       let got;
-      try { got = fs.readSync(fd, buf, 0, n, null); } catch (e) { return fail('File read error'); }
+      try { got = fs.readSync(fd, buf, 0, n, offset); } catch (e) { return fail('File read error'); }
       if (got === 0) {
         // 到文件尾：回 close 并断开（与 C++ 一致）
         try { sock.write('close\n', () => sock.end()); } catch (e) {}
@@ -155,8 +159,17 @@ function startServer(opts) {
         log(`[info] ${peer} 完成 ${filePath}`);
         return;
       }
+      offset += got;
+      const atEnd = offset >= totalSize;
+      if (atEnd) {
+        // 与 C++ 一致：尾块发出后紧跟 "close\n" 并断开
+        try { sock.write(buf.subarray(0, got)); sock.end('close\n'); } catch (e) {}
+        cleanup();
+        log(`[info] ${peer} 完成 ${filePath}`);
+        return;
+      }
       if (!sock.write(buf.subarray(0, got))) {
-        // 背压：等 drain 再继续读下一行（简单起见暂停处理）
+        // 背压：等 drain 再继续读下一行
         sock.pause();
         sock.once('drain', () => sock.resume());
       }
