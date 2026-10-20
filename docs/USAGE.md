@@ -20,6 +20,7 @@ AdoreMix 是一套基于 Qt/C++ 的广播服务器系统，支持文字转语音
 - [TTS 文字转语音](#tts-文字转语音)
 - [WebUI 切换](#webui-切换)
 - [健康检查](#健康检查)
+- [可选组件](#可选组件)（NGINX / 配置管理 UI / Audio8 TTS / MP3Server）
 - [配置项详解](#配置项详解)
 - [工作目录结构](#工作目录结构)
 - [升级与卸载](#升级与卸载)
@@ -732,6 +733,9 @@ adoremix config init --force               # 重生成默认配置
 │   ├── app.pid
 │   └── app.log
 ├── logs/                           ← 服务日志（systemd 模式）
+│   ├── svc.log / svc.err           ← 主服务输出
+│   └── mp3server.log               ← MP3Server 输出（装了选装时）
+├── mp3server-winservice.js         ← Windows 服务包装脚本（仅 Windows 装了 MP3Server）
 ├── tty/                            ← TTS 临时音频
 ├── dmp/                            ← 崩溃转储
 ├── temp/                           ← 临时文件
@@ -789,17 +793,30 @@ adoremix doctor
 
 ### 卸载
 
+推荐用内置命令（自动停服务 + 卸系统服务）：
+
 ```bash
-# 1. 停服务
-adoremix stop
-adoremix service uninstall   # 如果注册了系统服务
+# 只卸服务，保留工作目录（config.ini / .Adore.db / docroot 媒体文件都在）
+adoremix uninstall
 
-# 2. 卸 npm 包
+# 连工作目录一起删（不可恢复，会删所有配置和用户数据）
+adoremix uninstall --purge
+
+# 最后卸 npm 包
 npm uninstall -g @oxiaom/adoremix
-
-# 3. 删工作目录（可选，会删所有用户数据）
-sudo rm -rf /opt/adoremix
 ```
+
+选装组件需要单独卸（主包卸载不会自动处理）：
+
+```bash
+adoremix mp3server uninstall
+adoremix audio8 uninstall
+adoremix nginx uninstall
+adoremix config-manager uninstall
+```
+
+> `adoremix uninstall --purge` 等价于以前的「停服务 + 删 /opt/adoremix」手工步骤；
+> 反复做干净环境测试时用 `--purge` 最省事。
 
 ---
 
@@ -905,6 +922,43 @@ adoremix version   # 应 ≥ 1.0.18
 
 ---
 
+### MP3Server（选装）
+
+**设备连不上 / 拉流超时**
+
+```bash
+adoremix mp3server status                  # 服务 + 端口 + docroot 一次看全
+ss -ltnp | grep 6665                       # 确认端口在监听
+journalctl -u adoremix-mp3server -n 50     # 服务日志
+```
+
+常见原因：端口被改但设备侧没同步、防火墙未放行端口、消费端连的 IP 不对。
+
+**拉流报 `error: File not found or cannot open`**
+
+- 设备发的是**相对于 docroot 的路径**（`music/a.mp3`，不是 `/data/music/a.mp3`）
+- 检查服务运行用户对文件是否有读权限：`ls -l <docroot>/<路径>`
+- `docroot` 配置与文件实际位置不一致（`adoremix config get MP3Server.docroot`）
+
+**换了同名文件但播放的还是旧内容**
+
+MP3 起始帧位置按文件路径缓存，替换文件后重启服务：`systemctl restart adoremix-mp3server`。
+
+### Audio8（选装）
+
+**服务起不来 / 600 秒内未就绪**
+
+```bash
+adoremix doctor --fix                 # 会检查单元/venv/模型/音色/内存
+journalctl -u audio8-tts -n 50
+```
+
+最常见原因：模型没下载（`adoremix audio8-fetch-model`）、内存不足（模型常驻约 1.8GB）、onnxruntime 版本不符合 `<1.24` 约束。
+
+**合成很慢**
+
+CPU int8 推理，2 核赛扬实测约 15 秒生成 1 秒音频。弱 CPU 建议只用定时广播预生成，或换云端 TTS（xf/edge）。
+
 ## 常见问题
 
 ### Q: 必须装 Node.js 吗？
@@ -936,8 +990,9 @@ adoremix start --workdir /opt/adoremix-2
 - **质量最高**：xf（讯飞）
 - **性价比**：minimax（包月几十，质量接近讯飞）
 - **免费测试**：edge（Microsoft Edge TTS，质量不错，但需要 python）
+- **完全离线**：audio8（本地部署，不依赖任何云服务；需 Linux + 约 1.8GB 内存 + 423MB 模型，弱 CPU 合成慢，适合定时广播预生成）
 
-建议：先用 edge 测试跑通，正式部署用 minimax。
+建议：先用 edge 测试跑通，正式部署用 minimax；内网/无外网环境用 audio8。
 
 ### Q: config.ini 改了不生效？
 
@@ -960,6 +1015,31 @@ TTS provider 切换**不需要重启**（dispatcher 每次调用都重新读 con
 
 ## 版本历史
 
+- **v1.0.68**: 文档补全（MP3Server 改端口/改目录步骤、配置项表、端口清单、故障排查、卸载命令）+ CLI 帮助
+- **v1.0.67**: MP3Server 关闭连接后的输入保护
+- **v1.0.66**: MP3Server 尾块发出后立即回 `close`（对齐 C++ 原版）
+- **v1.0.65**: **MP3Server 选装**（全平台 TCP 分块推流，Node 实现，`adoremix mp3server`）
+- **v1.0.64**: 修复 audio8 服务探测在 Windows 必误报不可达
+- **v1.0.63**: doctor 新增 Audio8 本机部署体检（单元/venv/模型/音色/健康/内存/磁盘）
+- **v1.0.62**: Audio8 重跑 install 不再删除已下载的 423MB 模型
+- **v1.0.61**: 修复 audio8 写 config.ini 的路径与工作目录
+- **v1.0.60**: Audio8 0.1B INT8 端到端适配（正确 runtime、uvicorn 启动、线程按核数自适应、默认音色、WAV→MP3）
+- **v1.0.58 ~ 1.0.59**: fetch-model 三处修复（307 重定向/真实文件清单/模型目录）+ 安装链路（双层目录平仓/venv 对齐/清华镜像）
+- **v1.0.57**: 新增 `audio8-fetch-model`（模型下载与 install 解耦）
+- **v1.0.56**: Audio8 内置离线源码 tarball（不依赖 GitHub 可达）
+- **v1.0.42 ~ 1.0.55**: Audio8 TTS 选装探索与各发行版环境适配（包管理器嗅探、python3.11、systemd 绝对路径）
+- **v1.0.40**: `PackSize` 默认 1024→2048，修复 mp3 流播放卡死
+- **v1.0.38**: 设备配置管理 UI 选装（`config-manager`，端口 9877）
+- **v1.0.36**: doctor 校验所有捆绑库均从 `lib/` 加载
+- **v1.0.34**: 平台子包版本一致性校验（识别镜像同步滞后）
+- **v1.0.32**: 新增 `adoremix uninstall`（`--purge` 删工作目录）
+- **v1.0.30**: Linux ARM 包 etc 扁平化 + 捆绑 lame
+- **v1.0.29**: 补齐 `.Adore.db` 默认数据库
+- **v1.0.28**: 放弃 macOS Intel（x64）支持
+- **v1.0.27**: 系统要求补充 Linux 发行版兼容矩阵
+- **v1.0.26**: 安装路径非 ASCII 拦截
+- **v1.0.24**: doctor 增加所有依赖库版本兼容性检查
+- **v1.0.23**: Windows 统一 Qt 5.15.2（修复 64 位 exe + 32 位 DLL 崩溃）
 - **v1.0.18**: WebUI 切换保留用户数据（mp3 等）
 - **v1.0.17**: WebUI 多版本（low 16k / high 44.1k）
 - **v1.0.15**: TTS dispatcher 完整版（xf / minimax / edge + CLI 命令）

@@ -35,7 +35,7 @@ AdoreMix 广播服务器的跨平台 npm 安装器、运行器和服务管理器
 | macOS x64 (Intel) | — | ❌ 已放弃支持（仅支持 Apple Silicon） |
 | macOS ARM64 (Apple Silicon) | `@oxiaom/adoremix-darwin-arm64` | 已支持 |
 
-MySQL / Redis / nginx 由用户自备，配置项写入 `config.ini`。
+MySQL / Redis 由用户自备，配置项写入 `config.ini`。nginx 可通过 `adoremix nginx install` 选装（Linux），也可用已有的 nginx。
 
 ## 用户使用
 
@@ -73,14 +73,19 @@ adoremix config list
 | 命令 | 说明 |
 |---|---|
 | `adoremix version` | 打印版本和原生二进制路径 |
-| `adoremix install` | 初始化工作目录 |
-| `adoremix start [--daemon]` | 启动 |
-| `adoremix stop` | 停止 |
-| `adoremix restart` | 重启 |
-| `adoremix status` | 状态 |
+| `adoremix install [--force]` | 初始化工作目录 |
+| `adoremix start [--daemon] / stop / restart / status` | 启停与状态 |
 | `adoremix logs [-f]` | 日志 |
 | `adoremix config get/set/list/init` | 配置管理 |
-| `adoremix service install/uninstall/status` | 系统服务 |
+| `adoremix config network / preurl / webui / log` | IP、CDN、WebUI、日志开关 |
+| `adoremix tts list/config/test/voices/deps` | TTS 配置与检查 |
+| `adoremix doctor [--fix]` | 健康检查 + 自动修复 |
+| `adoremix service install/uninstall/status` | 系统服务（开机自启） |
+| `adoremix mp3server install/uninstall/status` | 选装：MP3Server 分块推流（全平台） |
+| `adoremix nginx install/uninstall/status` | 选装：nginx 静态加速（Linux） |
+| `adoremix config-manager install/uninstall/status` | 选装：设备配置管理 UI（Linux） |
+| `adoremix audio8 install/uninstall/status` + `audio8-fetch-model` | 选装：本地离线 TTS（Linux） |
+| `adoremix uninstall [--purge]` | 卸载（`--purge` 连工作目录） |
 
 ## 工作目录
 

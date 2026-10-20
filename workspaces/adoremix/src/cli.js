@@ -498,7 +498,7 @@ function buildProgram() {
 
   audio8
     .command('status')
-    .description('检查本机 Audio8 TTS 服务健康（GET /v1/models）')
+    .description('检查本机 Audio8 TTS 服务健康（GET /api/health）')
     .option('--url <url>', '自定义 base_url，默认 http://127.0.0.1:8024')
     .action(async (opts) => {
       const mod = require('../tts/providers/audio8');
@@ -510,21 +510,10 @@ function buildProgram() {
       }
     });
 
-  audio8
-    .command('fetch-model [url]')
-    .description('单独下载 Audio8 TTS 模型（核心 ~423MB）到 ~/audio8/onnx_runtime_0_1b_int8/model/，与 audio8 install 解耦避免 install 卡住')
-    .option('--registration', '同时下载声音克隆注册子模型（约 +396MB，基础 TTS 不需要）')
-    .action(async (url, opts) => {
-      const mod = require('../tts/providers/audio8');
-      try {
-        process.exitCode = await mod.fetchModel({ url, registration: !!opts.registration });
-      } catch (e) {
-        logger.error(e.message);
-        process.exitCode = 1;
-      }
-    });
+  // 顶级命令(不依赖 audio8 group)。
+  // 注：不能挂到 audio8 group 下——commander 在 group 之后又注册了其它 group 时,
+  // 该子命令会被静默丢弃(实测 audio8 fetch-model 不出现在 audio8 --help 里)。
 
-  // 顶级命令(不依赖 audio8 group)
   program
     .command('audio8-fetch-model [url]')
     .description('下载 Audio8 TTS 模型（单独使用，不依赖 audio8 install）')

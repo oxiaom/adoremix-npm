@@ -26,8 +26,8 @@
 
 ## ✨ 特性
 
-- 🎯 **一键部署** — `npm install -g @oxiaom/adoremix` 跨 6 平台（Windows / Linux x64 / ARM64 / ARM / macOS x64 / macOS ARM64）
-- 🔊 **多 TTS 引擎** — 讯飞 / MiniMax / Edge TTS 三选一，配置切换零代码改动
+- 🎯 **一键部署** — `npm install -g @oxiaom/adoremix` 跨 5 平台（Windows x64 / Linux x64 / ARM64 / ARM / macOS Apple Silicon）
+- 🔊 **多 TTS 引擎** — 讯飞 / MiniMax / Edge / Audio8 本地离线，配置切换零代码改动
 - 🌐 **双 WebUI** — 低码率（16k，WiFi/互联网）+ 高码率（44.1k，局域网）一键切换
 - 🚀 **开机自启** — Linux systemd / Windows Service 自动注册
 - 🩺 **健康检查** — `adoremix doctor` 全面体检 + 自动修复
@@ -87,13 +87,22 @@ adoremix service install
 | 命令 | 用途 |
 |---|---|
 | `adoremix install` | 初始化工作目录 |
-| `adoremix start/stop/status` | 服务管理 |
+| `adoremix start/stop/restart/status` | 服务管理 |
+| `adoremix logs -f` | 查看日志 |
 | `adoremix service install` | 注册开机自启 |
-| `adoremix config network` | 配置 IP（自动列网卡） |
-| `adoremix config webui` | 切换 WebUI 版本（low/high） |
-| `adoremix tts config` | 配置 TTS provider |
-| `adoremix tts test "你好"` | 测试 TTS |
-| `adoremix doctor` | 健康检查 |
+| `adoremix config network / preurl / webui / log` | IP、CDN、WebUI、日志开关 |
+| `adoremix tts config / test / voices / deps` | TTS 配置、测试、音色、依赖 |
+| `adoremix doctor [--fix]` | 健康检查 + 自动修复 |
+| `adoremix uninstall [--purge]` | 卸载（`--purge` 连工作目录） |
+
+**选装组件**（不影响主服务）：
+
+| 命令 | 用途 | 平台 |
+|---|---|---|
+| `adoremix mp3server install` | MP3Server 分块推流（6665） | 全平台 |
+| `adoremix nginx install` | nginx 静态加速（9876）+ preurl 切换 | Linux |
+| `adoremix config-manager install` | 设备配置管理 UI（9877） | Linux |
+| `adoremix audio8 install` + `adoremix audio8-fetch-model` | 本地离线 TTS（8024） | Linux |
 
 完整命令见 [使用文档](USAGE.md)。
 
@@ -117,6 +126,7 @@ npm 会自动按当前平台拉对应子包，**不用手动选**。
 | 讯飞（xf） | ~4000 元/年 | Node.js | ⭐⭐⭐⭐⭐ |
 | MiniMax | 包月几十元 | Node.js | ⭐⭐⭐⭐ |
 | Edge TTS | **免费** | python + ffmpeg | ⭐⭐⭐⭐ |
+| Audio8（本地） | **免费**（自部署） | Linux + ~1.8GB 内存 + 423MB 模型 | ⭐⭐⭐（弱 CPU 慢，适合定时广播） |
 
 切换 provider 只改 config.ini 一个字段，Qt 代码不用动：
 ```bash
