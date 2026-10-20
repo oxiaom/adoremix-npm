@@ -107,5 +107,10 @@ module.exports = {
     audio8_base_url: 'http://127.0.0.1:8024',
     audio8_voice_override: '',
     audio8_model_dir: ''
+  },
+  MP3Server: {
+    port: 6665,
+    // 留空 = 工作目录下 etc/docroot（与 nginx 选装共用同一份媒体目录）
+    docroot: ''
   }
 };

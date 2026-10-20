@@ -539,6 +539,62 @@ function buildProgram() {
       }
     });
 
+  const mp3srv = program
+    .command('mp3server')
+    .description('MP3Server 选装：TCP 分块推流 MP3 文件（端口 6665，docroot 与 nginx 共用），开机自启');
+
+  mp3srv
+    .command('install')
+    .description('注册 MP3Server 系统服务（Linux systemd / Windows 服务，开机自启），写 config.ini [MP3Server]')
+    .option('--workdir <path>')
+    .action(async (opts) => {
+      const mod = require('./mp3server');
+      try {
+        process.exitCode = await mod.install({ workdir: resolveWorkdir(opts.workdir) });
+      } catch (e) {
+        logger.error(e.message);
+        process.exitCode = 1;
+      }
+    });
+
+  mp3srv
+    .command('uninstall')
+    .description('卸载 MP3Server 服务（保留 config.ini 与 docroot 媒体文件）')
+    .option('--workdir <path>')
+    .action((opts) => {
+      const mod = require('./mp3server');
+      try {
+        process.exitCode = mod.uninstall({ workdir: resolveWorkdir(opts.workdir) });
+      } catch (e) {
+        logger.error(e.message);
+        process.exitCode = 1;
+      }
+    });
+
+  mp3srv
+    .command('status')
+    .description('检查 MP3Server 服务/端口/docroot 状态')
+    .option('--workdir <path>')
+    .action(async (opts) => {
+      const mod = require('./mp3server');
+      try {
+        process.exitCode = await mod.status({ workdir: resolveWorkdir(opts.workdir) });
+      } catch (e) {
+        logger.error(e.message);
+        process.exitCode = 1;
+      }
+    });
+
+  mp3srv
+    .command('serve')
+    .description('前台运行 MP3Server（systemd/Windows 服务内部使用，也可手动调试）')
+    .option('--workdir <path>')
+    .option('--host <addr>', '监听地址，默认 0.0.0.0')
+    .action((opts) => {
+      const mod = require('./mp3server');
+      mod.serve({ workdir: resolveWorkdir(opts.workdir), host: opts.host });
+    });
+
   const cfgmgr = program
     .command('config-manager')
     .description('设备配置管理 UI（配置 IP / 修改 config.ini / 查看日志），端口 9877，开机自启');

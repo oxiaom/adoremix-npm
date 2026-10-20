@@ -15,7 +15,8 @@
   - [WebUI 切换](USAGE.md#webui-切换)
   - [健康检查](USAGE.md#健康检查)
 
-- **可选组件（仅 Linux）**
+- **可选组件**
+  - [MP3Server 音频分块服务（全平台）](USAGE.md#mp3server-音频分块服务选装全平台)
   - [NGINX 静态加速](USAGE.md#nginx-静态加速)
   - [设备配置管理 UI](USAGE.md#设备配置管理-uiconfig-manager)
   - [Audio8 TTS 自动部署](USAGE.md#audio8-tts本地流式-tts自动远程部署)

@@ -439,6 +439,33 @@ function runDoctor(workdir, opts) {
     }
   }
 
+  // 8.5 MP3Server 选装体检（部署过才检查，未部署仅提示可选）
+  if (process.platform !== 'darwin') {
+    const mp3 = require('./mp3server');
+    const unitExists = process.platform === 'linux' && fs.existsSync('/etc/systemd/system/adoremix-mp3server.service');
+    if (unitExists) {
+      logger.log('');
+      logger.log('=== MP3Server 检查 ===');
+      const mp3Port = (cfgObj.MP3Server && parseInt(cfgObj.MP3Server.port, 10)) || mp3.DEFAULT_PORT;
+      const mp3Docroot = (cfgObj.MP3Server && cfgObj.MP3Server.docroot) || path.join(workdir, 'etc', 'docroot');
+      if (fs.existsSync(mp3Docroot)) logger.ok(`✓ docroot ${mp3Docroot}`);
+      else {
+        issues.push({ type: 'mp3server-docroot', severity: 'warn', msg: `MP3Server docroot 不存在：${mp3Docroot}` });
+        logger.warn(`⚠  docroot 不存在：${mp3Docroot}`);
+      }
+      let st = 'unknown';
+      try { st = execSync('systemctl is-active adoremix-mp3server 2>/dev/null', { encoding: 'utf8' }).trim(); } catch (e) {}
+      if (st === 'active') {
+        logger.ok(`✓ adoremix-mp3server 运行中（端口 ${mp3Port}）`);
+      } else {
+        issues.push({ type: 'mp3server-active', severity: 'warn', msg: `adoremix-mp3server 未运行（${st}）：systemctl restart adoremix-mp3server，日志 journalctl -u adoremix-mp3server -n 30` });
+        logger.warn(`⚠  adoremix-mp3server 未运行（${st}）`);
+      }
+    } else {
+      logger.log('○ MP3Server 未安装（选装：adoremix mp3server install）');
+    }
+  }
+
   // 9. Audio8 本机部署体检（Linux + 本机装了 audio8 或 provider=audio8 且指向本机时）
   if (process.platform === 'linux') {
     const a8 = require('./doctor-audio8');

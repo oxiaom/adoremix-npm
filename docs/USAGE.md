@@ -476,9 +476,12 @@ adoremix doctor --fix     # 检查 + 自动修复
 
 ---
 
-## 可选组件（仅 Linux）
+## 可选组件
 
-以下是**可选安装**的运维工具，仅支持 Linux（依赖 systemd），Windows 不可用。
+以下是**可选安装**的组件，不装不影响 AdoreMix 主服务。
+
+- NGINX 静态加速 / 设备配置管理 UI / Audio8 TTS：**仅 Linux**（依赖 systemd）
+- MP3Server 音频分块服务：**全平台**（Windows / Linux x64 / ARM64 / ARM / macOS）
 
 ### NGINX 静态加速
 
@@ -552,6 +555,32 @@ CPU int8 推理速度取决于 CPU 核数与单核性能：
 - 全链路已实测通过：install → fetch-model → 默认音色 → 合成 MP3（含 WAV→MP3 转码）
 - 冷启动加载模型约 20~30 秒；长文本按比例耗时，建议广播文本控制在 100 字内
 - 弱 CPU 机器建议：定时广播提前生成，或继续用 xf（讯飞）/edge（微软云）云端 TTS
+
+### MP3Server 音频分块服务（选装，全平台）
+
+设备端按 TCP 协议分块拉取 MP3 文件的服务（原 `Adore_mix2/MP3Server` 的 Node 重实现，线协议完全一致）。
+与 AdoreMix 主包同一套分发，**无需编译**，Windows / Linux x64 / ARM64 / ARM / macOS 通用。
+
+```bash
+adoremix mp3server install     # 注册系统服务（Linux systemd / Windows 服务），开机自启
+adoremix mp3server status      # 检查服务 + 端口 + docroot
+adoremix mp3server uninstall   # 卸载服务（config 与媒体文件保留）
+adoremix mp3server serve       # 前台运行（调试用）
+```
+
+- **默认端口 6665**，可在 `config.ini` 修改：`[MP3Server] port=6665`
+- **docroot** 默认 = 工作目录下 `etc/docroot`（与 nginx 选装共用同一份媒体目录），可用 `[MP3Server] docroot=` 指定其它目录
+- **协议**（与设备端约定）：
+  1. 设备连接后发一行相对路径（如 `music/a.mp3\n`）
+  2. 服务端回一行音频字节数（自动跳过 ID3v2 标签，从第一个 MP3 帧开始算）`\n`
+  3. 设备发一行字节数 N（≤1MB），服务端回 N 字节音频；重复
+  4. 读到文件尾服务端回 `close\n` 并断开；设备可随时发 `close` 主动断开
+- 路径会做安全校验（禁止 `../` 和绝对路径，禁止越出 docroot）
+- 空闲 10 分钟自动断开；单次请求上限 1MB（与原版一致）
+- 日志：`<工作目录>/logs/mp3server.log`（systemd 下也可 `journalctl -u adoremix-mp3server -f`）
+
+> 与 nginx（9876 HTTP 静态）的区别：MP3Server 是**设备主动分块拉流**的老协议（TCP 行协议），
+> 适用于只支持该协议的老设备；新设备走 nginx HTTP 即可。
 
 ### 多机部署方案
 - 内存 ≥3GB 的 Linux 主机：本机装 Audio8（全离线，不依赖云 TTS）
