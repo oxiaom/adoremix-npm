@@ -6,6 +6,7 @@
  * 协议：
  *   1. 客户端连上后发一行相对路径（music/a.mp3\n）
  *   2. 服务端回一行音频字节数（已跳过 ID3v2 标签）+"\n"
+ *      （legacyHandshake 模式改为回 "well\n"，兼容极老固件）
  *   3. 客户端发一行字节数 N，服务端回 N 字节音频；重复
  *   4. 读到文件尾：服务端回 "close\n" 并断开；客户端可随时发 "close"
  *
@@ -84,6 +85,7 @@ function startServer(opts) {
   const root = path.resolve(opts.docroot);
   const port = opts.port || 6665;
   const host = opts.host || '0.0.0.0';
+  const legacyHandshake = !!opts.legacyHandshake;
   const log = opts.log || ((m) => console.log(m));
   const frameCache = new Map();
 
@@ -135,8 +137,9 @@ function startServer(opts) {
         fileSize = st.size - audioStart;
         offset = audioStart;
         state = 'chunks';
-        log(`[info] ${peer} 推送 ${line} 起始=${audioStart} 大小=${fileSize}`);
-        sock.write(String(fileSize) + '\n');
+        log(`[info] ${peer} 推送 ${line} 起始=${audioStart} 大小=${fileSize}` + (legacyHandshake ? '（legacy 握手）' : ''));
+        // legacy: 极老固件认 "well\n" 作为首包，不带文件大小，靠边发边收到 close 结束
+        sock.write(legacyHandshake ? 'well\n' : String(fileSize) + '\n');
         return;
       }
 

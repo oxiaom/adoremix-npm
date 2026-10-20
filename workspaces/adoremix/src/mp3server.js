@@ -27,11 +27,14 @@ function readSettings(workdir) {
   const cfg = require('./config');
   const obj = cfg.readConfig(workdir) || {};
   const s = obj.MP3Server || {};
+  const legacyRaw = String(s.legacy_handshake === undefined ? '' : s.legacy_handshake).toLowerCase();
   return {
     port: parseInt(s.port, 10) || DEFAULT_PORT,
     docroot: s.docroot && String(s.docroot).trim()
       ? String(s.docroot).trim()
-      : path.join(workdir, 'etc', 'docroot')
+      : path.join(workdir, 'etc', 'docroot'),
+    // 极老固件兼容：首包回 "well\n" 而不是文件大小
+    legacyHandshake: legacyRaw === 'true' || legacyRaw === '1' || legacyRaw === 'yes'
   };
 }
 
@@ -50,7 +53,7 @@ function portOpen(port, host) {
 function serve(opts) {
   opts = opts || {};
   const workdir = opts.workdir || paths.defaultWorkdir();
-  const { port, docroot } = readSettings(workdir);
+  const { port, docroot, legacyHandshake } = readSettings(workdir);
   if (!fs.existsSync(docroot)) {
     try { fs.mkdirSync(docroot, { recursive: true }); } catch (e) {}
   }
@@ -59,6 +62,7 @@ function serve(opts) {
     port,
     host: opts.host || '0.0.0.0',
     docroot,
+    legacyHandshake,
     log: (m) => logger.log(m)
   });
   return null; // 常驻，不返回
@@ -198,7 +202,8 @@ async function status(opts) {
   const { port, docroot } = readSettings(workdir);
   let problems = 0;
 
-  logger.log(`配置：port=${port}  docroot=${docroot}`);
+  const { legacyHandshake } = readSettings(workdir);
+  logger.log(`配置：port=${port}  docroot=${docroot}  legacy_handshake=${legacyHandshake ? 'true(回 well)' : 'false'}`);
   if (!fs.existsSync(docroot)) {
     logger.warn(`docroot 不存在：${docroot}`);
     problems++;

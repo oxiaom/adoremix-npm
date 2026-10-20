@@ -111,6 +111,8 @@ module.exports = {
   MP3Server: {
     port: 6665,
     // 留空 = 工作目录下 etc/docroot（与 nginx 选装共用同一份媒体目录）
-    docroot: ''
+    docroot: '',
+    // 极老设备固件兼容：首包回 "well\n"（不带文件大小），默认 false
+    legacy_handshake: false
   }
 };

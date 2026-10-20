@@ -604,6 +604,8 @@ adoremix config get MP3Server.docroot
   2. 服务端回一行音频字节数（自动跳过 ID3v2 标签，从第一个 MP3 帧开始算）`\n`
   3. 设备发一行字节数 N（≤1MB），服务端回 N 字节音频；重复
   4. 读到文件尾服务端回 `close\n` 并断开；设备可随时发 `close` 主动断开
+- **极老固件兼容**：早期版本首包返回 `well\n`（不带文件大小）。若现场老设备连上后不拉流，设置
+  `adoremix config set MP3Server.legacy_handshake true` 并 `systemctl restart adoremix-mp3server`（其余流程不变）
 - 路径会做安全校验（禁止 `../` 和绝对路径，禁止越出 docroot）
 - 空闲 10 分钟自动断开；单次请求上限 1MB（与原版一致）
 - 日志：`<工作目录>/logs/mp3server.log`（systemd 下也可 `journalctl -u adoremix-mp3server -f`）
@@ -668,6 +670,7 @@ adoremix config init --force               # 重生成默认配置
 |---|---|---|
 | `port` | MP3Server 监听端口（改后需重启服务，设备侧同步修改） | 6665 |
 | `docroot` | 媒体文件根目录（空 = 工作目录 `etc/docroot`） | (空) |
+| `legacy_handshake` | 极老设备固件兼容：首包回 `well\n` 而不是文件大小 | false |
 
 #### [listener] 段（QtWebApp HTTP 服务）
 
