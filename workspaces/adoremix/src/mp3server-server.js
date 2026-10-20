@@ -116,6 +116,7 @@ function startServer(opts) {
     sock.on('close', () => { cleanup(); log(`[info] ${peer} 断开`); });
 
     const handleLine = (lineRaw) => {
+      if (closed) return;
       const line = lineRaw.trim();
       if (state === 'path') {
         const abs = validateRelPath(line, root);
