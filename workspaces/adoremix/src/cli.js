@@ -541,7 +541,7 @@ function buildProgram() {
 
   const mp3srv = program
     .command('mp3server')
-    .description('MP3Server 选装：TCP 分块推流 MP3 文件（端口 6665，docroot 与 nginx 共用），开机自启');
+    .description('MP3Server 选装：TCP 分块推流 MP3 文件（默认端口 6665、docroot=工作目录/etc/docroot；改端口/目录用 adoremix config set MP3Server.port|docroot 后 systemctl restart adoremix-mp3server）');
 
   mp3srv
     .command('install')
@@ -573,7 +573,7 @@ function buildProgram() {
 
   mp3srv
     .command('status')
-    .description('检查 MP3Server 服务/端口/docroot 状态')
+    .description('检查 MP3Server 服务/端口/docroot 状态（端口与目录来自 config.ini [MP3Server]）')
     .option('--workdir <path>')
     .action(async (opts) => {
       const mod = require('./mp3server');

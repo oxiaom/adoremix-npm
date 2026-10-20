@@ -570,6 +570,34 @@ adoremix mp3server serve       # 前台运行（调试用）
 
 - **默认端口 6665**，可在 `config.ini` 修改：`[MP3Server] port=6665`
 - **docroot** 默认 = 工作目录下 `etc/docroot`（与 nginx 选装共用同一份媒体目录），可用 `[MP3Server] docroot=` 指定其它目录
+
+#### 修改端口 / 修改媒体目录
+
+两项都改 `config.ini` 后**重启服务**生效，不需要重装：
+
+```bash
+# 改端口（例：6665 → 7000）
+adoremix config set MP3Server.port 7000
+systemctl restart adoremix-mp3server
+adoremix mp3server status        # 确认新端口在监听
+
+# 改媒体目录（例：指向独立磁盘 /data/mp3）
+adoremix config set MP3Server.docroot /data/mp3
+systemctl restart adoremix-mp3server
+adoremix mp3server status        # 会显示该目录下的文件数
+
+# 查看当前值
+adoremix config get MP3Server.port
+adoremix config get MP3Server.docroot
+```
+
+⚠️ 注意事项：
+
+1. **设备侧要同步改**：MP3Server 由设备主动连 TCP，设备配置里指向的端口/地址必须与服务端一致，否则改完服务端设备连不上。
+2. **必须重启服务**：端口和目录都在服务启动时从 `config.ini` 读取，改配置不会热生效。
+3. **目录权限**：服务以安装用户运行（root 安装即 root），自定义 docroot 需该用户可读，否则拉流报 `File not found or cannot open`。
+4. **文件缓存**：音频起始位置按文件路径缓存，同名文件被替换后建议重启服务刷新。
+5. `docroot` 修改不影响 nginx 选装（nginx 有自己的 `etc/docroot` 路径）；两边要一致时请分别配置。
 - **协议**（与设备端约定）：
   1. 设备连接后发一行相对路径（如 `music/a.mp3\n`）
   2. 服务端回一行音频字节数（自动跳过 ID3v2 标签，从第一个 MP3 帧开始算）`\n`
@@ -633,6 +661,13 @@ adoremix config init --force               # 重生成默认配置
 | `provider` | TTS provider（`xf` / `minimax` / `edge`） |
 | `minimax_token` | MiniMax API token |
 
+#### [MP3Server] 段（选装 MP3Server 音频分块服务）
+
+| 键 | 说明 | 默认值 |
+|---|---|---|
+| `port` | MP3Server 监听端口（改后需重启服务，设备侧同步修改） | 6665 |
+| `docroot` | 媒体文件根目录（空 = 工作目录 `etc/docroot`） | (空) |
+
 #### [listener] 段（QtWebApp HTTP 服务）
 
 | 键 | 说明 | 默认值 |
@@ -652,6 +687,10 @@ adoremix config init --force               # 重生成默认配置
 | 6002 | 媒体数据端口 |
 | 6007 | 管理端口 |
 | 6036 | 数据接收端口 |
+| 6665 | MP3Server 分块推流（选装，可改 `[MP3Server] port`） |
+| 9876 | nginx 静态加速（选装，`adoremix nginx install`） |
+| 9877 | 设备配置管理 UI（选装，`adoremix config-manager install`） |
+| 8024 | Audio8 本地 TTS（选装，`adoremix audio8 install`） |
 | 6000/6001 | 网络交叉端口 |
 | 6003/6006 | 推流端口 |
 
