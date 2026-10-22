@@ -432,6 +432,23 @@ adoremix restart
 
 ---
 
+## 设备在线判定（重要）
+
+服务端每 **5 秒**向每台设备发送心跳（`OKOK` + `JXXXXX` 探活），设备会立即回包。任意回包都会刷新“最后活跃时间”。
+
+| 场景 | 判定时间 |
+|---|---|
+| 设备正常断开（TCP FIN/RST） | 立即 |
+| 设备断电 / 断网（无 FIN） | 静默超过 `DevOfflineTimeout`（默认 20 秒，最慢再加 5 秒轮询） |
+| 公网高延迟/丢包 | 建议调大 `DevOfflineTimeout`（20~30），避免误判 |
+
+```ini
+[Settings]
+DevOfflineTimeout=20   ; 秒，局域网可设 12~15
+```
+
+> 采用类似 MQTT 的 keepalive 模型：心跳间隔 5s，超时阈值 = 若干个心跳周期；TCP 半开（断电无 FIN）时，只有“多久没收到设备数据”才能可靠判断真实在线状态。
+
 ## 健康检查
 
 ```bash
@@ -644,6 +661,7 @@ adoremix config init --force               # 重生成默认配置
 | `Fip` | 文件服务 IP（跟随 LocalIP） | 127.0.0.1 |
 | `preurl` | 设备拉资源基准 URL | http://127.0.0.1:12080/ |
 | `isopenrizhi` | 日志开关（true 会保存 mp3 + 播放日志） | false |
+| `DevOfflineTimeout` | 设备静默多少秒判定离线（局域网 12~15，公网 20~30） | 20 |
 | `webui` | WebUI 版本（low / high） | low |
 | `wbport` | web 后台端口 | 6082 |
 | `DataPort` | 媒体数据端口 | 6002 |
