@@ -111,8 +111,8 @@ Linux 包为**自包含**构建：Qt 5.15.2 + ICU 67 等全部依赖捆绑在 `l
 - 网络：能访问 npm registry（国内建议配 `npm config set registry https://registry.npmmirror.com`）
 
 **外部服务**（业务运行需要，按需自备）：
-- MySQL（业务数据）
-- Redis（可选，缓存）
+- **MySQL（可选）**：仅 `dbk=1` 时使用；默认 `dbk=3` 使用内置 SQLite（`.Adore.db`），无需额外部署
+- **Redis：已移除**，不再需要（服务端代码已删除全部 Redis 逻辑）
 - ffmpeg（仅 TTS 用 edge provider 时需要）
 
 ---
@@ -671,8 +671,8 @@ adoremix config init --force               # 重生成默认配置
 | `task_username` | MySQL 用户名 | root |
 | `task_passwd` | MySQL 密码 | (空) |
 | `basename` | MySQL 数据库名 | adore |
-| `EnableRedis` | 启用 Redis | false |
-| `RedisIP` / `RedisPort` / `RedisAUTH` | Redis 连接 | 127.0.0.1 / 6379 / (空) |
+| `dbk` | 数据库类型：3=SQLite（默认）/ 1=MySQL | 3 |
+| ~~`EnableRedis`~~ / ~~`RedisIP`~~ / ~~`RedisPort`~~ / ~~`RedisAUTH`~~ | **已废弃**（Redis 代码已移除，配置被忽略） | — |
 | `ttsxfAPPID` / `ttsxfAPISecret` / `ttsxfAPIKey` | 讯飞 TTS 凭证 | (空) |
 
 #### [TTS] 段
@@ -1036,6 +1036,8 @@ TTS provider 切换**不需要重启**（dispatcher 每次调用都重新读 con
 
 ## 版本历史
 
+- **v1.0.72**: 设备在线判定改用心跳 OKOK + 可配置 `DevOfflineTimeout`（默认 20s）；文档补充 SQLite 默认/Redis 已移除
+- **v1.0.71**: 新增 `DevOfflineTimeout` 配置项 + 「设备在线判定」章节
 - **v1.0.68**: 文档补全（MP3Server 改端口/改目录步骤、配置项表、端口清单、故障排查、卸载命令）+ CLI 帮助
 - **v1.0.67**: MP3Server 关闭连接后的输入保护
 - **v1.0.66**: MP3Server 尾块发出后立即回 `close`（对齐 C++ 原版）

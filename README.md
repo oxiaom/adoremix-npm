@@ -35,7 +35,7 @@ AdoreMix 广播服务器的跨平台 npm 安装器、运行器和服务管理器
 | macOS x64 (Intel) | — | ❌ 已放弃支持（仅支持 Apple Silicon） |
 | macOS ARM64 (Apple Silicon) | `@oxiaom/adoremix-darwin-arm64` | 已支持 |
 
-MySQL / Redis 由用户自备，配置项写入 `config.ini`。nginx 可通过 `adoremix nginx install` 选装（Linux），也可用已有的 nginx。
+默认使用内置 SQLite（`.Adore.db`），MySQL 可选（`dbk=1`）；Redis 已移除，不再需要。nginx 可通过 `adoremix nginx install` 选装（Linux），也可用已有的 nginx。
 
 ## 用户使用
 

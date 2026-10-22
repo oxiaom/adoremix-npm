@@ -32,7 +32,7 @@
 - 🚀 **开机自启** — Linux systemd / Windows Service 自动注册
 - 🩺 **健康检查** — `adoremix doctor` 全面体检 + 自动修复
 - 📋 **配置向导** — 交互式配 IP / CDN / TTS / 数据库
-- 🔌 **零外部依赖** — Qt 运行时 + 业务资源全部打包（除 MySQL/Redis 自备）
+- 🔌 **零外部依赖** — Qt 运行时 + 业务资源全部打包（默认 SQLite，MySQL 可选，Redis 已移除）
 
 ## 📦 安装
 
