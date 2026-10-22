@@ -436,15 +436,21 @@ adoremix restart
 
 服务端每 **5 秒**向每台设备发送心跳 `OKOK`，设备会立即回包（4 字节 `OKOK`）。任意回包都会刷新“最后活跃时间”。
 
+| 网络环境 | 建议 `DevOfflineTimeout` |
+|---|---|
+| 局域网（<5ms） | 15 秒 |
+| 普通公网（50~200ms） | 25 秒（默认） |
+| 弱网 / 4G / 高丢包 | 30~40 秒 |
+
 | 场景 | 判定时间 |
 |---|---|
 | 设备正常断开（TCP FIN/RST） | 立即 |
-| 设备断电 / 断网（无 FIN） | 静默超过 `DevOfflineTimeout`（默认 20 秒，最慢再加 5 秒轮询） |
+| 设备断电 / 断网（无 FIN） | 静默超过 `DevOfflineTimeout`（默认 25 秒，最慢再加 5 秒轮询） |
 | 公网高延迟/丢包 | 建议调大 `DevOfflineTimeout`（20~30），避免误判 |
 
 ```ini
 [Settings]
-DevOfflineTimeout=20   ; 秒，局域网可设 12~15
+DevOfflineTimeout=25   ; 秒，局域网可设 15
 ```
 
 > 采用类似 MQTT 的 keepalive 模型：心跳间隔 5s，超时阈值 = 若干个心跳周期；TCP 半开（断电无 FIN）时，只有“多久没收到设备数据”才能可靠判断真实在线状态。
@@ -661,7 +667,7 @@ adoremix config init --force               # 重生成默认配置
 | `Fip` | 文件服务 IP（跟随 LocalIP） | 127.0.0.1 |
 | `preurl` | 设备拉资源基准 URL | http://127.0.0.1:12080/ |
 | `isopenrizhi` | 日志开关（true 会保存 mp3 + 播放日志） | false |
-| `DevOfflineTimeout` | 设备静默多少秒判定离线（局域网 12~15，公网 20~30） | 20 |
+| `DevOfflineTimeout` | 设备静默多少秒判定离线（局域网 15，公网 25~40） | 25 |
 | `webui` | WebUI 版本（low / high） | low |
 | `wbport` | web 后台端口 | 6082 |
 | `DataPort` | 媒体数据端口 | 6002 |
@@ -1036,6 +1042,7 @@ TTS provider 切换**不需要重启**（dispatcher 每次调用都重新读 con
 
 ## 版本历史
 
+- **v1.0.74**: 设备连接生命周期改造（会话代际/指针纪律/探活）；默认 `DevOfflineTimeout=25`；文档补齐设备协议、WAL 备份、端口清单
 - **v1.0.72**: 设备在线判定改用心跳 OKOK + 可配置 `DevOfflineTimeout`（默认 20s）；文档补充 SQLite 默认/Redis 已移除
 - **v1.0.71**: 新增 `DevOfflineTimeout` 配置项 + 「设备在线判定」章节
 - **v1.0.68**: 文档补全（MP3Server 改端口/改目录步骤、配置项表、端口清单、故障排查、卸载命令）+ CLI 帮助

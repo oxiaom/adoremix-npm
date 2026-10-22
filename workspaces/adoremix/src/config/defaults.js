@@ -18,7 +18,7 @@ module.exports = {
     DataPort: 6002,
     EnableRedis: false,
     // 设备静默多久判定离线（秒）：局域网 12~15，公网 20~30
-    DevOfflineTimeout: 20,
+    DevOfflineTimeout: 25,
     LocalIP: '127.0.0.1',
     ManagePort: 6007,
     Netcross_Port0: 6000,
