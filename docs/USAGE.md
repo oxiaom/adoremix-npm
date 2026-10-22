@@ -710,16 +710,12 @@ adoremix config init --force               # 重生成默认配置
 | 端口 | 用途 |
 |---|---|
 | **12080** | HTTP API + 网页（浏览器访问） |
-| 6082 | web 后台 |
-| 12083 | cutehttpd 服务 |
-| 6002 | 媒体数据端口 |
-| 6007 | 管理端口 |
-| 6036 | 数据接收端口 |
 | 6665 | MP3Server 分块推流（选装，可改 `[MP3Server] port`） |
 | 9876 | nginx 静态加速（选装，`adoremix nginx install`） |
 | 9877 | 设备配置管理 UI（选装，`adoremix config-manager install`） |
 | 8024 | Audio8 本地 TTS（选装，`adoremix audio8 install`） |
-| 6000/6001 | 网络交叉端口 |
+
+> 设备内部通信端口与协议不在公开文档中说明，请在私有部署环境中按需配置防火墙。
 | 6003/6006 | 推流端口 |
 
 ---
