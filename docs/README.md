@@ -39,13 +39,13 @@
 **Windows**（PowerShell）：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/oxiaom/adoremix-npm/main/scripts/install.ps1 | iex"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr https://cdn.jsdelivr.net/gh/oxiaom/adoremix-npm@main/scripts/install.ps1 -OutFile $env:TEMP\adoremix-install.ps1 -UseBasicParsing; & $env:TEMP\adoremix-install.ps1"
 ```
 
 **Linux**（x64 / arm64 / armv7）：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/oxiaom/adoremix-npm/main/scripts/install.sh | bash
+curl -fsSL https://cdn.jsdelivr.net/gh/oxiaom/adoremix-npm@main/scripts/install.sh | bash
 ```
 
 脚本会自动完成：检测/安装 Node.js 18+（装在用户目录，**不需要管理员权限**）→ 配置 npm 全局目录 → 安装 `@oxiaom/adoremix` → 初始化工作目录 → 自动选择网卡 IP → `adoremix doctor` 体检 → 后台启动（Linux 有 systemd 且 root 时自动注册开机自启；Windows 管理员模式自动注册服务）。

@@ -42,13 +42,13 @@ AdoreMix 广播服务器的跨平台 npm 安装器、运行器和服务管理器
 **Windows**（PowerShell）：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/oxiaom/adoremix-npm/main/scripts/install.ps1 | iex"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr https://cdn.jsdelivr.net/gh/oxiaom/adoremix-npm@main/scripts/install.ps1 -OutFile $env:TEMP\adoremix-install.ps1 -UseBasicParsing; & $env:TEMP\adoremix-install.ps1"
 ```
 
 **Linux**：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/oxiaom/adoremix-npm/main/scripts/install.sh | bash
+curl -fsSL https://cdn.jsdelivr.net/gh/oxiaom/adoremix-npm@main/scripts/install.sh | bash
 ```
 
 自动检测并安装 Node.js 18+（用户目录、无需 root）、安装 AdoreMix、初始化配置、体检并启动；root + systemd 或 Windows 管理员模式下自动注册开机自启。

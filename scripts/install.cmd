@@ -11,7 +11,7 @@ set "LOCAL_PS1=%~dp0install.ps1"
 if exist "%LOCAL_PS1%" (
   powershell -NoProfile -ExecutionPolicy Bypass -File "%LOCAL_PS1%"
 ) else (
-  powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/oxiaom/adoremix-npm/main/scripts/install.ps1 | iex"
+  powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr https://cdn.jsdelivr.net/gh/oxiaom/adoremix-npm@main/scripts/install.ps1 -OutFile $env:TEMP\adoremix-install.ps1 -UseBasicParsing; & $env:TEMP\adoremix-install.ps1"
 )
 
 echo.

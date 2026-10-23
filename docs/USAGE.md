@@ -60,12 +60,12 @@ AdoreMix 是一套基于 Qt/C++ 的广播服务器系统，支持文字转语音
 
 ```powershell
 # Windows PowerShell
-powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/oxiaom/adoremix-npm/main/scripts/install.ps1 | iex"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "iwr https://cdn.jsdelivr.net/gh/oxiaom/adoremix-npm@main/scripts/install.ps1 -OutFile $env:TEMP\adoremix-install.ps1 -UseBasicParsing; & $env:TEMP\adoremix-install.ps1"
 ```
 
 ```bash
 # Linux
-curl -fsSL https://raw.githubusercontent.com/oxiaom/adoremix-npm/main/scripts/install.sh | bash
+curl -fsSL https://cdn.jsdelivr.net/gh/oxiaom/adoremix-npm@main/scripts/install.sh | bash
 ```
 
 脚本会自动：检测/安装 Node.js 18+（用户目录、无需 root）→ 配置 npm 全局目录 → 安装 AdoreMix → 初始化工作目录 → 自动选择网卡 IP → `adoremix doctor` 体检 → 后台启动（root + systemd 或 Windows 管理员模式下自动注册开机自启）。
