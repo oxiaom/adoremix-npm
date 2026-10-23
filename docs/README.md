@@ -34,7 +34,36 @@
 - 📋 **配置向导** — 交互式配 IP / CDN / TTS / 数据库
 - 🔌 **零外部依赖** — Qt 运行时 + 业务资源全部打包（默认 SQLite，MySQL 可选，Redis 已移除）
 
-## 📦 安装
+## ⚡ 一条命令安装（推荐）
+
+**Windows**（PowerShell）：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/oxiaom/adoremix-npm/main/scripts/install.ps1 | iex"
+```
+
+**Linux**（x64 / arm64 / armv7）：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/oxiaom/adoremix-npm/main/scripts/install.sh | bash
+```
+
+脚本会自动完成：检测/安装 Node.js 18+（装在用户目录，**不需要管理员权限**）→ 配置 npm 全局目录 → 安装 `@oxiaom/adoremix` → 初始化工作目录 → 自动选择网卡 IP → `adoremix doctor` 体检 → 后台启动（Linux 有 systemd 且 root 时自动注册开机自启；Windows 管理员模式自动注册服务）。
+
+自定义参数（安装前设置环境变量）：
+
+| 变量 | 说明 | 示例 |
+|---|---|---|
+| `ADOREMIX_VERSION` | 指定版本，默认 `latest` | `1.0.76` |
+| `ADOREMIX_SKIP_START` | `1` = 装完不启动 | `1` |
+| `ADOREMIX_NO_SERVICE` | `1` = 不注册服务（Windows） | `1` |
+| `ADOREMIX_SERVICE` | `auto`/`yes`/`no`（Linux） | `no` |
+| `ADOREMIX_NPM_REGISTRY` | 指定 npm 源 | `https://registry.npmmirror.com` |
+| `ADOREMIX_NODE_MAJOR` | 自动安装的 Node 大版本，默认 20 | `22` |
+
+> 中国大陆网络如访问 GitHub 较慢，可先 `npm install -g @oxiaom/adoremix` 手动安装，效果相同。
+
+## 📦 手动安装
 
 ```bash
 # 装 Node.js 18+（已装跳过）
