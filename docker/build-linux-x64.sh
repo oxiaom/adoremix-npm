@@ -36,7 +36,7 @@ cat > "$DOCKERIGNORE" <<'EOF'
 debug release build-* *.o *.obj *.pdb *.zip *.rar *.tgz *.tar.gz *.7z *.img
 *.exe.debug *.dll.debug node_modules node_modules.rar package-lock.json
 logs temp dmp tty var *.log reqhttp.log .git .gitignore .DS_Store Thumbs.db
-a.out Makefile Makefile.Debug Makefile.Release
+a.out Makefile Makefile.Debug Makefile.Release etc/docroot_
 **/moc_*.cpp **/qrc_*.cpp **/ui_*.h **/*.pro.user*
 AdoreMixNSP.pro.user ForAvderMediaCore.pro.user ForAvderMediaCoremut.pro.user
 AdoreMixV8*_console_* AdoreMix64_V8* **/build-*/**/*

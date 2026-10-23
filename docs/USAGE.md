@@ -1056,6 +1056,7 @@ TTS provider 切换**不需要重启**（dispatcher 每次调用都重新读 con
 
 ## 版本历史
 
+- **v1.0.77**: Windows/Linux x64 二进制更新（sa_snlist 读写锁、未登记 SN 回收、HTTP 设备列表空指针修复）；Linux x64 2000 台 10 分钟验证通过
 - **v1.0.76**: 设备接入 P1 泄漏修复（转发节点/喊话通道/按键通道）；MP3 通道 ACK 粘包按个数消费、队列溢出丢最旧包、写失败不再卡流；移除已淘汰的 WiFi 机型（`leixing==2`）专用通道
 - **v1.0.74**: 设备连接生命周期改造（会话代际/指针纪律/探活）；默认 `DevOfflineTimeout=25`；文档补齐设备协议、WAL 备份、端口清单
 - **v1.0.72**: 设备在线判定改用心跳 OKOK + 可配置 `DevOfflineTimeout`（默认 20s）；文档补充 SQLite 默认/Redis 已移除
