@@ -73,13 +73,27 @@ jobs:
       - name: Verify binary
         if: env.skip != 'true'
         run: |
-          BIN=$(find workspaces/${{ matrix.platform }}/native -maxdepth 1 -type f -name "AdoreMix*" 2>/dev/null | head -1)
+          NATIVE="workspaces/${{ matrix.platform }}/native"
+          # 新布局：Qt 框架必须放在 .app bundle 里，二进制在 Contents/MacOS/
+          BIN=$(find "$NATIVE/AdoreMix.app/Contents/MacOS" -maxdepth 1 -type f -name "AdoreMix*" 2>/dev/null | head -1)
+          # 兼容旧的平铺布局
+          [ -n "$BIN" ] || BIN=$(find "$NATIVE" -maxdepth 1 -type f -name "AdoreMix*" 2>/dev/null | head -1)
           if [ -z "$BIN" ]; then
             echo "❌ 没找到 AdoreMix 二进制"
-            ls workspaces/${{ matrix.platform }}/native
+            ls "$NATIVE"
             exit 1
           fi
           file "$BIN"
+          # .app 布局还必须带 Qt 框架和 sqlitecipher 驱动
+          if [ -d "$NATIVE/AdoreMix.app" ]; then
+            test -f "$NATIVE/AdoreMix.app/Contents/Frameworks/QtCore.framework/Versions/5/QtCore" || {
+              echo "❌ 缺少 QtCore framework"; find "$NATIVE/AdoreMix.app/Contents/Frameworks" -maxdepth 3 | head -20; exit 1; }
+            test -f "$NATIVE/AdoreMix.app/Contents/PlugIns/sqldrivers/libsqlitecipher.dylib" || {
+              echo "❌ 缺少 sqlitecipher 驱动"; exit 1; }
+            if find "$NATIVE/AdoreMix.app" -type l | grep -q .; then
+              echo "❌ .app 里还有符号链接（npm pack 会丢弃）"; exit 1
+            fi
+          fi
 
       - name: Commit artifacts
         if: env.skip != 'true'
