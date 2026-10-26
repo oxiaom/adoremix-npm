@@ -2,7 +2,17 @@
 
 本文件记录 @oxiaom/adoremix 各版本变更。版本号同步主包 + 4-6 个平台子包。
 
-## 1.0.82 — 2026-10-27
+## 1.0.83 — 2026-10-27
+
+### 修复（严重，仅 darwin-arm64）：1.0.82 的包仍含 Homebrew 绝对路径
+- 1.0.82 虽然打出了 `AdoreMix.app`，但有两处依赖没改写：
+  - `Frameworks/libsqlitecipher.dylib` 从 Homebrew 原目录复制，依赖 `/opt/homebrew/opt/qt@5/...`（客户机必崩）
+  - `lame` 依赖 `/opt/homebrew/opt/mpg123/...`，且 `libwebp*` 依赖未打包的 `libsharpyuv.0.dylib`
+- 修复：sqlitecipher 改为从 macdeployqt 已改写的 `PlugIns/sqldrivers/` 副本复制；补带 `libmpg123.0.dylib`、`libsharpyuv.0.dylib` 并改写依赖。
+- CI 增加**全量 Mach-O 依赖解析**：遍历 app 内所有二进制/框架/插件，`@rpath` 必须能解析到实际文件，且禁止 `/opt`、`/usr/local`、`/Users` 绝对路径，构建不通过则失败。
+- **macOS 用户请使用 1.0.83（1.0.82 的 darwin 包已标记 deprecated）。** 其他平台 1.0.82/1.0.83 二进制相同。
+
+## 1.0.82 — 2026-10-27（darwin 包有缺陷，已被 1.0.83 取代）
 
 ### 二进制更新：darwin-arm64（macOS Apple Silicon）正式可用
 - 重写 macOS CI：`macos-15` runner + Homebrew 原生 arm64 Qt 5.15.19，构建成功（旧的 macos-14 + `brew update` 会退化为源码编译 python 而失败）。

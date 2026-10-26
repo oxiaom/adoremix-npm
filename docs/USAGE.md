@@ -1056,7 +1056,8 @@ TTS provider 切换**不需要重启**（dispatcher 每次调用都重新读 con
 
 ## 版本历史
 
-- **v1.0.82**: darwin-arm64 二进制正式可用（标准 `AdoreMix.app` 打包 Qt 框架/插件，修复旧包缺失 Qt 的问题）；剔除 57MB 测试音频，包体积减半
+- **v1.0.83**: 修复 1.0.82 darwin 包残留 Homebrew 绝对路径（sqlitecipher/lame/libsharpyuv），新增全量 Mach-O 依赖校验；macOS 请用此版本
+- **v1.0.82**: darwin-arm64 首次打出标准 `AdoreMix.app`（Qt 框架/插件），剔除 57MB 测试音频；darwin 包因绝对路径问题被 1.0.83 取代
 - **v1.0.81**: ARM (linux-arm64/arm) 二进制更新，包含 libmp3lame 转码与上传修复
 - **v1.0.80**: 音频时长改为四舍五入到秒；TTS 保存/播放路径（MPEG-2/2.5 MP3）验证通过；数据库保持默认 SQLite
 - **v1.0.79**: 内置 libmp3lame 转码（不再依赖外部 lame）+ 按解码样本精确计算音频时长；支持 MP3/16-bit WAV
