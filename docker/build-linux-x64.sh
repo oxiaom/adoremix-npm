@@ -62,12 +62,12 @@ NATIVE_DIR="$REPO_ROOT/workspaces/linux-x64/native"
 echo ""
 echo "==> 提取 /out -> $NATIVE_DIR"
 
-TMP_CID=$(docker create "$IMAGE_TAG")
-trap 'docker rm -f "$TMP_CID" >/dev/null 2>&1 || true; rm -f "$DOCKERIGNORE"' EXIT
-
+# 用容器内 tar 打包后单文件拷贝：Windows 上 docker cp 大量小文件极慢
 mkdir -p "$NATIVE_DIR"
 find "$NATIVE_DIR" -mindepth 1 ! -name README.md -delete 2>/dev/null || true
-docker cp "$TMP_CID:/out/." "$NATIVE_DIR/"
+docker run --rm -v "$NATIVE_DIR:/dest" --entrypoint /bin/bash "$IMAGE_TAG"   -c "tar -C /out -czf /dest/native.tgz ."
+tar -xzf "$NATIVE_DIR/native.tgz" -C "$NATIVE_DIR"
+rm -f "$NATIVE_DIR/native.tgz"
 # 源码 etc 里的旧备份目录（node_modules/puppeteer，约 193MB）不能进包
 rm -rf "$NATIVE_DIR/etc/docroot_"
 

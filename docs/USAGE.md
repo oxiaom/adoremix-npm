@@ -1056,6 +1056,7 @@ TTS provider 切换**不需要重启**（dispatcher 每次调用都重新读 con
 
 ## 版本历史
 
+- **v1.0.79**: 内置 libmp3lame 转码（不再依赖外部 lame）+ 按解码样本精确计算音频时长；支持 MP3/16-bit WAV
 - **v1.0.78**: 修复上传音频导致服务崩溃（线程 sqlite 未继承 Mp3Server）；修复 systemd 服务 203/EXEC 与启动即退出
 - **v1.0.77**: Windows/Linux x64 二进制更新（sa_snlist 读写锁、未登记 SN 回收、HTTP 设备列表空指针修复）；Linux x64 2000 台 10 分钟验证通过
 - **v1.0.76**: 设备接入 P1 泄漏修复（转发节点/喊话通道/按键通道）；MP3 通道 ACK 粘包按个数消费、队列溢出丢最旧包、写失败不再卡流；移除已淘汰的 WiFi 机型（`leixing==2`）专用通道

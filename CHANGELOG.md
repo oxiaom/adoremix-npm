@@ -2,6 +2,23 @@
 
 本文件记录 @oxiaom/adoremix 各版本变更。版本号同步主包 + 4-6 个平台子包。
 
+## 1.0.79 — 2026-10-26
+
+### 新特性：进程内 libmp3lame 转码 + 精确时长
+- 上传音频 / TTS 转码不再调用外部 `lame` 进程，改为内置 libmp3lame：
+  - 解码：`hip_decode`（mpglib）；编码：`lame_encode_buffer*`，支持重采样（如 48k→24k）
+  - 支持 MP3、16-bit PCM WAV；损坏文件返回 `TRANSCODE_ERROR`，不崩溃、不生成空文件
+- 时长按解码样本数精确计算，替换原来的 `filesize/码率+2` 估算（实测：179.018s→180，20.533s→21）
+- Windows 静态链接 LAME 3.100 x64（`LIB/libmp3lame.a`）；Linux 使用包内 `libmp3lame.so.0`
+- macOS 无 dylib 时回退外部 lame
+
+### 修复
+- 上传音频导致主进程 SIGSEGV（线程 sqlite 未继承 Mp3Server）——1.0.78 已修，本版沿用
+- `hip_decode` 一次解出多帧导致 PCM 缓冲越界（本次开发中发现并修复）
+
+### 验证
+- Windows 与 Linux 容器：普通 MP3、客户 7.3MB/179s MP3、16-bit WAV、随机损坏文件均符合预期
+
 ## 1.0.78 — 2026-10-26
 
 ### 修复（严重）：上传音频导致服务 SIGSEGV
