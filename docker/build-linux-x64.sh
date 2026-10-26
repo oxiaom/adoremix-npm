@@ -36,7 +36,7 @@ cat > "$DOCKERIGNORE" <<'EOF'
 debug release build-* *.o *.obj *.pdb *.zip *.rar *.tgz *.tar.gz *.7z *.img
 *.exe.debug *.dll.debug node_modules node_modules.rar package-lock.json
 logs temp dmp tty var *.log reqhttp.log .git .gitignore .DS_Store Thumbs.db
-a.out Makefile Makefile.Debug Makefile.Release etc/docroot_
+a.out Makefile Makefile.Debug Makefile.Release etc/docroot_ docroot_
 **/moc_*.cpp **/qrc_*.cpp **/ui_*.h **/*.pro.user*
 AdoreMixNSP.pro.user ForAvderMediaCore.pro.user ForAvderMediaCoremut.pro.user
 AdoreMixV8*_console_* AdoreMix64_V8* **/build-*/**/*
@@ -68,6 +68,8 @@ trap 'docker rm -f "$TMP_CID" >/dev/null 2>&1 || true; rm -f "$DOCKERIGNORE"' EX
 mkdir -p "$NATIVE_DIR"
 find "$NATIVE_DIR" -mindepth 1 ! -name README.md -delete 2>/dev/null || true
 docker cp "$TMP_CID:/out/." "$NATIVE_DIR/"
+# 源码 etc 里的旧备份目录（node_modules/puppeteer，约 193MB）不能进包
+rm -rf "$NATIVE_DIR/etc/docroot_"
 
 chmod 0755 "$NATIVE_DIR"/AdoreMix* 2>/dev/null || true
 chmod 0755 "$NATIVE_DIR/lame" 2>/dev/null || true

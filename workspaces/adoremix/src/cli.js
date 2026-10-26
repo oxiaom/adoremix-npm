@@ -261,6 +261,9 @@ function buildProgram() {
   // status 不委托（pidfile 检查已与 systemctl 一致）。仅 Linux + 服务 active 时生效。
   function systemdDelegate(cmd) {
     if (process.platform !== 'linux') return false;
+    // 由 systemd 单元自身启动时（ADOREMIX_UNDER_SYSTEMD=1），不能再 systemctl start 自己，
+    // 否则 CLI 立即返回 → 主进程退出 → systemd 认为服务结束
+    if (process.env.ADOREMIX_UNDER_SYSTEMD === '1') return false;
     const { execSync } = require('child_process');
     let active;
     try {

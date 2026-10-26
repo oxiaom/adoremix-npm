@@ -2,6 +2,17 @@
 
 本文件记录 @oxiaom/adoremix 各版本变更。版本号同步主包 + 4-6 个平台子包。
 
+## 1.0.78 — 2026-10-26
+
+### 修复（严重）：上传音频导致服务 SIGSEGV
+- **根因**：线程专属 sqlite（`forCurrentThread()`）没有继承主实例的 `Mp3Server` 指针；上传完成后 `findFirstAudioFrame()` 在空指针上访问 `casemap`（偏移 0x10）→ `segfault at 10`。dmesg：`QThread[...] segfault at 10 ... in AdoreMixV8.0.17_console_linuxx64`。
+- **修复**：线程 sqlite 复制 `Mp3Server`、`init_s`；成员初始化为 `nullptr`；调用前判空并返回 `MP3SERVER_NULL`。
+- **验证**：客户 Ubuntu 22.04 热更新后上传返回 `res:true / SUC`，服务进程持续存活，dmesg 无新 segfault。
+
+### 修复：systemd 服务 203/EXEC / 启动即退出
+- Node 装在 `/root/.nvm` 下时，服务用户 `adoremix` 无法执行 node（203/EXEC）→ 自动回退为 root 运行并打印提示。
+- 服务单元增加 `Environment=ADOREMIX_UNDER_SYSTEMD=1`，避免 CLI 在 systemd 内再次 `systemctl start` 自己导致主进程退出、服务显示 deactivated。
+
 ## 1.0.77 — 2026-10-23
 
 ### 二进制更新

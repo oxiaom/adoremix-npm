@@ -31,10 +31,30 @@ function chownWorkdir(workdir, username) {
   execSync(`chown -R ${username}:${username} ${workdir}`);
 }
 
+// Node 是否可被服务用户执行：root 下的 nvm 安装（/root/.nvm）adoremix 用户无法访问，
+// systemd 会报 203/EXEC。检测失败时回退为 root 运行并提示。
+function nodeUsableByServiceUser(nodePath) {
+  if (!isSystemMode()) return true;
+  if (nodePath.startsWith('/root/')) return false;
+  try {
+    execSync(`runuser -u adoremix -- test -x "${nodePath}"`, { stdio: 'ignore' });
+    return true;
+  } catch (e) {
+    // runuser 不存在时按路径判断，避免误报
+    if (e.status === 127) return true;
+    return false;
+  }
+}
+
 function fillTemplate(workdir) {
   const tplPath = path.join(__dirname, '..', '..', 'templates', 'adoremix.service.tmpl');
   let tpl = fs.readFileSync(tplPath, 'utf8');
-  const user = isSystemMode() ? 'adoremix' : os.userInfo().username;
+  let user = isSystemMode() ? 'adoremix' : os.userInfo().username;
+  if (isSystemMode() && !nodeUsableByServiceUser(paths.nodeExecutable())) {
+    user = 'root';
+    logger.warn('Node 安装在 /root 下（nvm），服务用户 adoremix 无法执行；服务将改为 root 运行。');
+    logger.warn('建议把 Node 安装到系统路径（/usr/bin/node）后重新执行 adoremix service install。');
+  }
   const node = paths.nodeExecutable();
   const cli = paths.cliBin();
   return tpl

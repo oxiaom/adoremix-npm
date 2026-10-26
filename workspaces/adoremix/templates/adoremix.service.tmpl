@@ -7,6 +7,7 @@ After=network.target mysqld.service redis.service
 Type=simple
 User=__USER__
 Group=__GROUP__
+Environment=ADOREMIX_UNDER_SYSTEMD=1
 WorkingDirectory=__WORKDIR__
 # 用前台模式（不加 --daemon）：node 持续运行作为 systemd 主进程，
 # systemd 才能正确跟踪/重启/停止服务。
