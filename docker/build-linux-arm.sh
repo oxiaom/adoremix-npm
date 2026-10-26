@@ -4,6 +4,7 @@
 # 比 ARM64 还慢一点（armv7 是 32 位，寄存器少）。
 
 set -euo pipefail
+export MSYS_NO_PATHCONV=1
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -74,10 +75,12 @@ NATIVE_DIR="$REPO_ROOT/workspaces/linux-arm/native"
 echo ""
 echo "==> 提取 /out -> $NATIVE_DIR"
 
-TMP_CID=$(docker create "$IMAGE_TAG")
 mkdir -p "$NATIVE_DIR"
 find "$NATIVE_DIR" -mindepth 1 ! -name README.md -delete 2>/dev/null || true
-docker cp "$TMP_CID:/out/." "$NATIVE_DIR/"
+docker run --rm -v "$NATIVE_DIR:/dest" --entrypoint bash "$IMAGE_TAG"   -c "tar -C /out -czf /dest/native.tgz ."
+tar -xzf "$NATIVE_DIR/native.tgz" -C "$NATIVE_DIR"
+rm -f "$NATIVE_DIR/native.tgz"
+rm -rf "$NATIVE_DIR/etc/docroot_"
 
 chmod 0755 "$NATIVE_DIR"/AdoreMix* 2>/dev/null || true
 chmod 0755 "$NATIVE_DIR/lame" 2>/dev/null || true

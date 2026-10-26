@@ -14,6 +14,7 @@
 #   ./docker/build-linux-arm64.sh --no-extract             # 只构建不提取
 
 set -euo pipefail
+export MSYS_NO_PATHCONV=1
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -161,17 +162,15 @@ NATIVE_DIR="$REPO_ROOT/workspaces/linux-arm64/native"
 echo ""
 echo "==> 提取 /out -> $NATIVE_DIR"
 
-TMP_CID=$(docker create "$IMAGE_TAG")
-function cleanup() {
-  docker rm -f "$TMP_CID" >/dev/null 2>&1 || true
-}
-trap cleanup EXIT
-
 # 清空旧产物（保留 README.md）
 mkdir -p "$NATIVE_DIR"
 find "$NATIVE_DIR" -mindepth 1 ! -name README.md -delete 2>/dev/null || true
 
-docker cp "$TMP_CID:/out/." "$NATIVE_DIR/"
+# 容器内打 tar 再单文件拷贝（Windows docker cp 大量小文件极慢）
+docker run --rm -v "$NATIVE_DIR:/dest" --entrypoint bash "$IMAGE_TAG"   -c "tar -C /out -czf /dest/native.tgz ."
+tar -xzf "$NATIVE_DIR/native.tgz" -C "$NATIVE_DIR"
+rm -f "$NATIVE_DIR/native.tgz"
+rm -rf "$NATIVE_DIR/etc/docroot_"
 
 # 8) 修正权限（Linux 二进制 +x）
 chmod 0755 "$NATIVE_DIR"/AdoreMix* 2>/dev/null || true

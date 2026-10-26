@@ -1,0 +1,132 @@
+# 复用已装好 Qt 的旧 arm32 builder 镜像（避免 apt 镜像源 404/网络问题）
+FROM adoremix-arm-builder:latest
+ARG ADORE_VERSION=8.0.17
+ARG TARGET_BIN=AdoreMixV8.0.17_console_linuxarm
+COPY . /src
+WORKDIR /src
+
+# 0) 清理 Windows 残留
+RUN find /src \( \
+        -name '.qmake.stash' -o \
+        -name '*.pro.user' -o \
+        -name '*.pro.user.*' -o \
+        -name 'Makefile' -o \
+        -name 'Makefile.Debug' -o \
+        -name 'Makefile.Release' -o \
+        -name '.moc' -o \
+        -name '.uic' -o \
+        -name '.rcc' -o \
+        -name '.obj' -o \
+        -name 'mkspecs' -o \
+        -name 'build-*' -o \
+        -name 'debug' -o \
+        -name 'release' -o \
+        -name '*.o' -o \
+        -name '*.obj' -o \
+        -name '*.a' -o \
+        -name 'libsqlitecipher.so' -o \
+        -name 'libsqlitecipher.so.*' \
+    \) -prune -exec rm -rf {} + 2>/dev/null ; \
+    echo "=== /src 清理完成 ==="
+
+# 0.5) 修复大小写敏感
+RUN find /src -type f \( -name '*.h' -o -name '*.cpp' -o -name '*.hpp' \) | while read f; do \
+        dir=$(dirname "$f"); \
+        base=$(basename "$f"); \
+        lower=$(echo "$base" | tr 'A-Z' 'a-z'); \
+        if [ "$base" != "$lower" ] && [ ! -e "$dir/$lower" ]; then \
+            ln -s "$base" "$dir/$lower"; \
+        fi; \
+    done ; \
+    echo "=== 大小写符号链接创建完成 ==="
+
+# 1) 编译 QtCipherSqlitePlugin
+RUN SUBDIR=$(ls -d QtCipherSqlitePlugin-develop/QtCipherSqlitePlugin-develop 2>/dev/null || echo QtCipherSqlitePlugin-develop) && \
+    if [ -d "$SUBDIR" ] && [ -f "$SUBDIR/QtCipherSqlitePlugin.pro" ]; then \
+        find "$SUBDIR" -name 'Makefile' -delete ; \
+        find "$SUBDIR" -name 'Makefile.Debug' -delete ; \
+        find "$SUBDIR" -name 'Makefile.Release' -delete ; \
+        cd "$SUBDIR/sqlitecipher" && \
+        qmake sqlitecipher.pro && \
+        make -j$(nproc) && \
+        SO_PATH=$(find . -name 'libsqlitecipher.so' | head -1) && \
+        cp "$SO_PATH" /usr/lib/arm-linux-gnueabihf/ && \
+        chmod 0755 /usr/lib/arm-linux-gnueabihf/libsqlitecipher.so && \
+        (ldconfig || true) && \
+        QT_PLUGINS=$(qmake -query QT_INSTALL_PLUGINS) && \
+        mkdir -p $QT_PLUGINS/sqldrivers && \
+        cp "$SO_PATH" $QT_PLUGINS/sqldrivers/ ; \
+    else \
+        echo "警告：QtCipherSqlitePlugin 源码未找到" ; \
+    fi
+
+# 2) 修复 .pro 硬编码路径 + 改 TARGET
+RUN sed -i \
+        -e 's|-L/opt/qt5\.[0-9][^ ]*plugins/sqldrivers||g' \
+        -e 's|^TARGET = .*|TARGET = '${TARGET_BIN}'|' \
+        AdoreMix.pro && \
+    grep -E '^(TARGET|LIBS)' AdoreMix.pro
+
+# 3) 编译主程序（QEMU armhf 模拟，比 x64 慢 5-10 倍）
+RUN qmake AdoreMix.pro && make -j$(nproc)
+
+# 4) 验证二进制
+RUN test -f ${TARGET_BIN} && \
+    ls -la ${TARGET_BIN} && \
+    (file ${TARGET_BIN} || echo "file 命令缺失")
+
+# 5) 收集产物
+RUN mkdir -p /out /out/lib /out/platforms /out/sqldrivers \
+             /out/bearer /out/iconengines /out/imageformats \
+             /out/translations /out/mediaservice /out/audio \
+             /out/etc /out/conf /out/html \
+             /out/logs /out/var /out/dmp /out/tty /out/temp
+
+RUN cp ${TARGET_BIN} /out/ && chmod 0755 /out/${TARGET_BIN}
+
+RUN QT_LIB=$(qmake -query QT_INSTALL_LIBS) && \
+    for lib in libQt5Core libQt5Network libQt5Sql libQt5WebSockets \
+               libQt5Multimedia libQt5Svg libQt5Concurrent libQt5Xml \
+               libQt5MultimediaGstTools libQt5OpenGL libQt5DBus; do \
+        cp $QT_LIB/${lib}.so* /out/lib/ 2>/dev/null || true ; \
+    done
+
+RUN QT_PLUGINS=$(qmake -query QT_INSTALL_PLUGINS) && \
+    for sub in platforms sqldrivers bearer iconengines imageformats mediaservice audio; do \
+        rm -rf /out/$sub && \
+        (cp -r $QT_PLUGINS/$sub /out/$sub 2>/dev/null || mkdir -p /out/$sub) ; \
+    done && \
+    mkdir -p /out/translations && \
+    cp /usr/share/qt5/translations/qtbase_*.qm /out/translations/ 2>/dev/null || true
+
+RUN for lib in libhiredis libopus libopusfile libmp3lame libssl libcrypto \
+               libsqlite3 libmariadb libstdc++ libgcc_s libdouble-conversion libpcre2-16 \
+               libicuuc libicui18n libicudata \
+               libgssapi_krb5 libkrb5 libk5crypto libkrb5support libcom_err libkeyutils \
+               libpcre libz libglib-2.0; do \
+        find /lib /usr/lib -name "${lib}*.so*" -exec cp -a {} /out/lib/ \; 2>/dev/null ; \
+    done
+
+RUN printf '[Paths]\nPlugins=./\nLibraries=./lib\n' > /out/qt.conf
+
+# 用 cp -r etc/. /out/etc/ 避免嵌套：cp -r etc /out/etc 会变成 /out/etc/etc，应用读的是扁平 etc/docroot
+RUN mkdir -p /out/etc && cp -r etc/. /out/etc/ 2>/dev/null || true ; \
+    cp -r conf /out/conf 2>/dev/null || mkdir -p /out/conf ; \
+    cp -r html /out/html 2>/dev/null || mkdir -p /out/html ; \
+    for f in tts.js find.js findsc.js xiaoboshu.py .Adore.db; do \
+        [ -f "$f" ] && cp "$f" /out/ ; \
+    done ; \
+    which lame && cp $(which lame) /out/lame && chmod 0755 /out/lame || true
+
+# --force-rpath 强制 DT_RPATH（可传递）：Qt .so 的传递依赖（ICU 等）也从 $ORIGIN/lib 解析，包自包含。
+RUN cd /out && patchelf --set-rpath '$ORIGIN/lib' --force-rpath ${TARGET_BIN} 2>/dev/null || true
+RUN find /out -type l -exec sh -c 'target=$(readlink -f "$1") && [ -n "$target" ] && rm "$1" && cp "$target" "$1"' _ {} \; 2>/dev/null ; \
+    find /out -xtype l -delete 2>/dev/null
+
+RUN cd /out && (ldd ${TARGET_BIN} | grep "not found" && echo "警告：有未解决的依赖" && exit 1 || echo "依赖完整")
+
+RUN printf '{"version":"%s","platform":"linux","arch":"arm","bin":"%s","builtAt":"%s"}\n' \
+        "${ADORE_VERSION}" "${TARGET_BIN}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        > /out/.adoremix-native.json
+
+CMD ["bash", "-c", "find /out -maxdepth 2 -type f | sort"]

@@ -17,7 +17,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 ARG ADORE_VERSION=8.0.17
 ARG TARGET_BIN=AdoreMixV8.0.17_console_linuxarm64
 
-RUN sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g; s|security.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list 2>/dev/null || true; \
+RUN true; \
     apt-get update && \
     (apt-get install -y --no-install-recommends \
         build-essential \

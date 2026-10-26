@@ -2,6 +2,14 @@
 
 本文件记录 @oxiaom/adoremix 各版本变更。版本号同步主包 + 4-6 个平台子包。
 
+## 1.0.81 — 2026-10-26
+
+### 二进制更新：ARM 架构
+- **linux-arm64 / linux-arm**：重新编译（复用原有 ARM builder 镜像，跳过 apt 源问题），首次包含 libmp3lame 进程内转码、上传崩溃修复、精确时长。
+- QEMU 实测：上传 MP3 时长 21 秒、WAV 3 秒、损坏文件返回 `TRANSCODE_ERROR`，服务稳定。
+- Windows x64 / Linux x64 沿用 1.0.80 的修复二进制。
+- **darwin-arm64**：二进制仍为旧版（GitHub macOS runner 的 Homebrew 安装耗时过长，构建未在本次发版前完成），版本号同步；完成后单独发版更新。
+
 ## 1.0.80 — 2026-10-26
 
 ### 修复/完善：音频时长与 TTS 路径
