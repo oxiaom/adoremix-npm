@@ -1056,6 +1056,7 @@ TTS provider 切换**不需要重启**（dispatcher 每次调用都重新读 con
 
 ## 版本历史
 
+- **v1.0.80**: 音频时长改为四舍五入到秒；TTS 保存/播放路径（MPEG-2/2.5 MP3）验证通过；数据库保持默认 SQLite
 - **v1.0.79**: 内置 libmp3lame 转码（不再依赖外部 lame）+ 按解码样本精确计算音频时长；支持 MP3/16-bit WAV
 - **v1.0.78**: 修复上传音频导致服务崩溃（线程 sqlite 未继承 Mp3Server）；修复 systemd 服务 203/EXEC 与启动即退出
 - **v1.0.77**: Windows/Linux x64 二进制更新（sa_snlist 读写锁、未登记 SN 回收、HTTP 设备列表空指针修复）；Linux x64 2000 台 10 分钟验证通过

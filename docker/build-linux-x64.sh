@@ -4,6 +4,7 @@
 # 比 ARM64 快 5-10 倍（x64 native，不走 QEMU 翻译）。
 
 set -euo pipefail
+export MSYS_NO_PATHCONV=1   # 防止 Git Bash 把容器内 /out、/dest、bash 转成 Windows 路径
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
