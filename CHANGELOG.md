@@ -2,6 +2,20 @@
 
 本文件记录 @oxiaom/adoremix 各版本变更。版本号同步主包 + 4-6 个平台子包。
 
+## 1.0.82 — 2026-10-27
+
+### 二进制更新：darwin-arm64（macOS Apple Silicon）正式可用
+- 重写 macOS CI：`macos-15` runner + Homebrew 原生 arm64 Qt 5.15.19，构建成功（旧的 macos-14 + `brew update` 会退化为源码编译 python 而失败）。
+- 修复历史遗留的 mac 打包错误：旧流程把裸二进制传给 `macdeployqt`，报 `Could not find bundle binary`，**Qt 框架和 sqldrivers 插件从未进入安装包**，客户机上无法启动。
+- 现在产物是标准 `AdoreMix.app`（Qt Frameworks + PlugIns + sqlitecipher 驱动），launcher 指向 `AdoreMix.app/Contents/MacOS/AdoreMixV8.0.17_console_darwinarm64`。
+- npm 打包会丢弃符号链接：CI 中把 framework 的软链全部实体化，并断言包内无符号链接。
+- 附带 `lame` + `libmp3lame.0.dylib`，macOS 同样走进程内转码，不要求客户安装 lame。
+- CI 新增依赖存在性检查 + 实际启动 5 秒的 dyld 冒烟测试，本版通过。
+- 移除 darwin 包内开发测试上传的 `etc/docroot/mp3`（约 57MB），tar 体积 110MB → 51MB。
+
+### 其他平台
+- Windows x64 / linux-x64 / linux-arm64 / linux-arm 与 1.0.81 相同（已包含 libmp3lame 进程内转码、上传 SIGSEGV 修复、精确时长）。
+
 ## 1.0.81 — 2026-10-26
 
 ### 二进制更新：ARM 架构

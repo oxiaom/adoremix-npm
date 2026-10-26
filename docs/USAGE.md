@@ -196,8 +196,8 @@ adoremix install --no-interactive           # 跳过配置向导，用默认值
 macOS 二进制首次启动可能被 Gatekeeper 拦截，出现"无法验证开发者"提示。处理方法：
 
 ```bash
-# 方案 1：移除 quarantine 属性（推荐）
-xattr -d com.apple.quarantine /path/to/workdir/AdoreMixV8.0.17_console_darwin*
+# 方案 1：移除 quarantine 属性（推荐，递归处理 .app bundle）
+xattr -dr com.apple.quarantine /path/to/workdir/AdoreMix.app
 
 # 方案 2：系统偏好设置 → 安全性与隐私 → 允许打开
 ```
@@ -1056,7 +1056,8 @@ TTS provider 切换**不需要重启**（dispatcher 每次调用都重新读 con
 
 ## 版本历史
 
-- **v1.0.81**: ARM (linux-arm64/arm) 二进制更新，包含 libmp3lame 转码与上传修复；darwin 二进制待 CI 完成后单独更新
+- **v1.0.82**: darwin-arm64 二进制正式可用（标准 `AdoreMix.app` 打包 Qt 框架/插件，修复旧包缺失 Qt 的问题）；剔除 57MB 测试音频，包体积减半
+- **v1.0.81**: ARM (linux-arm64/arm) 二进制更新，包含 libmp3lame 转码与上传修复
 - **v1.0.80**: 音频时长改为四舍五入到秒；TTS 保存/播放路径（MPEG-2/2.5 MP3）验证通过；数据库保持默认 SQLite
 - **v1.0.79**: 内置 libmp3lame 转码（不再依赖外部 lame）+ 按解码样本精确计算音频时长；支持 MP3/16-bit WAV
 - **v1.0.78**: 修复上传音频导致服务崩溃（线程 sqlite 未继承 Mp3Server）；修复 systemd 服务 203/EXEC 与启动即退出
