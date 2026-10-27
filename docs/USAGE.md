@@ -1056,6 +1056,7 @@ TTS provider 切换**不需要重启**（dispatcher 每次调用都重新读 con
 
 ## 版本历史
 
+- **v1.0.84**: 修复带封面/ID3 标签的 MP3 转码时长与音调错误（解码前跳过 ID3v2 标签）；全平台二进制重建
 - **v1.0.83**: 修复 1.0.82 darwin 包残留 Homebrew 绝对路径（sqlitecipher/lame/libsharpyuv），新增全量 Mach-O 依赖校验；macOS 请用此版本
 - **v1.0.82**: darwin-arm64 首次打出标准 `AdoreMix.app`（Qt 框架/插件），剔除 57MB 测试音频；darwin 包因绝对路径问题被 1.0.83 取代
 - **v1.0.81**: ARM (linux-arm64/arm) 二进制更新，包含 libmp3lame 转码与上传修复

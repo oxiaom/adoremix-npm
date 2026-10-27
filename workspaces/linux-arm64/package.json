@@ -1,6 +1,6 @@
 {
   "name": "@oxiaom/adoremix-linux-arm64",
-  "version": "1.0.83",
+  "version": "1.0.84",
   "description": "AdoreMix native binaries and resources for Linux ARM64 (aarch64)",
   "main": "./index.js",
   "_publish_os": [
