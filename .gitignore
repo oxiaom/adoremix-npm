@@ -10,3 +10,10 @@ workspaces/adoremix/workdir-test/
 .env
 .env.local
 *.bat.local
+
+# 运行期产生的文件（不该进仓库）
+workspaces/*/native/.Adore.db-shm
+workspaces/*/native/.Adore.db-wal
+workspaces/*/native/config.ini
+workspaces/*/native/simswap_log.json
+workspaces/*/native/*.log
