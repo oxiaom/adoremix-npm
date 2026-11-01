@@ -450,6 +450,70 @@ adoremix restart
 
 ---
 
+## 端口系列（一套服务跑多个实例）
+
+一套服务要占十几个端口（设备控制、MP3 通道、喊话、运维命令、HTTP…）。
+逐个改端口很痛苦，所以引入了**端口系列**：给一个系列号，所有端口都从该系列的百位里取。
+
+```bash
+# 安装时指定系列号
+adoremix install --port-series 117
+
+# 已安装的实例切换
+adoremix config set-port-series 117
+```
+
+系列 117 对应的端口：
+
+| 配置项 | 默认 | 117 系列 | 用途 |
+|---|---|---|---|
+| `Settings.DPort` | 3333 | **11733** | 设备主控制通道 |
+| `Settings.DataPortBack3` | 6031 | 11731 | 设备备用控制通道 |
+| `Settings.OPort0` / `Netcross_Port0` | 6000 | 11700 | MP3 跨接 |
+| `Settings.OPort1` / `Netcross_Port1` | 6001 | 11701 | MP3 跨接 2 |
+| `Settings.DataPort` | 6002 | 11702 | 喊话裸流入口 |
+| `Settings.DataPortBack2` | 6030 | 11730 | 喊话裸流入口 2 |
+| `Settings.PS1` | 6003 | 11703 | 运维命令通道 |
+| `Settings.BjPort` | 6004 | 11704 | fcr 指令通道 |
+| `Settings.PS2` | 6006 | 11706 | 运维命令通道 2 |
+| `Settings.ManagePort` | 6007 | 11707 | 管理端口 |
+| `Settings.Pastcmd` | 6008 | 11708 | 过去命令 |
+| `Settings.wbport` | 6082 | 11782 | WebSocket 喊话 |
+| `Settings.cuteport` | 12083 | 11783 | 录音端口 |
+| `Settings.RDDATAPORT` | 7636 | 11790 | 二级数据端口 |
+| `listener.port` | 12080 | **11780** | HTTP 主服务 |
+| `MP3Server.port` | 6665 | 11765 | MP3Server |
+
+说明：
+
+- **只改本机监听的端口**。MySQL（`sqltask_port`）、Redis 等外部依赖端口不动。
+- `Fport`（上游服务器端口，来自 `snupdatareload.json`）也不属于本机，不在系列内。
+- 改完端口要**重启服务**才生效。
+- `install` 完成后会打印实际端口系列；如果配置里的端口不成套（有的不在同一系列），会告警提示。
+- 同一台机器上跑多套时，每套用不同系列号即可完全隔离。
+
+---
+
+## 数据库 schema 自动修复（升级不丢数据）
+
+客户**升级 exe 或 Linux 可执行文件**时，数据库是老版本建的，可能缺表缺列，
+导致程序读写异常。服务启动的第一件事就是核对 schema：
+
+- 缺表 → 按标准结构建表
+- 缺列 → `ALTER TABLE ADD COLUMN` 补上
+- **已有的表和列一个都不动**，老数据一条不少
+
+整个过程幂等：每次启动都跑，重复执行没有副作用。修了什么会打日志，现场可查：
+
+```
+schema repair: created tables: ("no_auto_enroll_snover")
+schema repair: added columns: ("sbox_device_info.iccid")
+```
+
+标准结构覆盖 21 张业务表（`sbox_device_info` / `snover` / `userfile` / `sbox_users` 等）。
+
+---
+
 ## 受控设备与 ICCID 自动采集（4G）
 
 4G 设备（AIR780EHV）开机时会通过 J 应答上报自己的 SIM 卡号（ICCID）。服务端自动采集，
@@ -752,6 +816,7 @@ adoremix config init --force               # 重生成默认配置
 | `dbk` | 数据库类型：3=SQLite（默认）/ 1=MySQL | 3 |
 | ~~`EnableRedis`~~ / ~~`RedisIP`~~ / ~~`RedisPort`~~ / ~~`RedisAUTH`~~ | **已废弃**（Redis 代码已移除，配置被忽略） | — |
 | `ttsxfAPPID` / `ttsxfAPISecret` / `ttsxfAPIKey` | 讯飞 TTS 凭证 | (空) |
+| `PortSeries` | 端口系列号（记录用，实际端口见下方「端口系列」） | (空) |
 | `AutoEnrollFee` | 4G 设备自动纳入受控设备时的月费（元） | 4.2 |
 | `AutoEnrollMonths` | 自动纳入受控设备时的有效期（月） | 12 |
 | `SimSwapLogFile` | 换卡历史 JSON 文件路径 | simswap_log.json |
@@ -1115,6 +1180,7 @@ TTS provider 切换**不需要重启**（dispatcher 每次调用都重新读 con
 ## 版本历史
 
 - **v1.0.84**: 修复带封面/ID3 标签的 MP3 转码时长与音调错误（解码前跳过 ID3v2 标签）；全平台二进制重建
+- **v1.0.86**: 数据库 schema 启动自检修复（升级 exe/Linux 可执行文件不丢数据，缺表缺列自动补）；安装支持 `--port-series 117` 端口系列；ICCID 按 ITU-T E.118 严格校验；darwin-arm64 本版未重建
 - **v1.0.85**: 修代码审查发现的 3 个问题 —— 帧粘连吞掉后续协议帧、卡号不同步导致漏计费、绝对路径启动时配置静默失效（1.0.84 的二进制不含这些修复，已废弃）
 - **v1.0.84**: 4G 设备 ICCID 自动采集并自动纳入受控设备（4.2 元/月、一年后到期）；受控记录只增不减，删除后不会被自动加回；换卡历史存档 `simswap_log.json`；修 `snover.iccid` 默认值与重建表的数据丢失隐患
 - **v1.0.83**: 修复 1.0.82 darwin 包残留 Homebrew 绝对路径（sqlitecipher/lame/libsharpyuv），新增全量 Mach-O 依赖校验；macOS 请用此版本
