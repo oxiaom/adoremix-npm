@@ -19,6 +19,40 @@
 - Windows x64、linux-x64、linux-arm64、linux-arm、darwin-arm64 全部用本次源码重建。
 - darwin 包额外清理 `etc` 下所有开发测试 mp3（含 `luyin2/luyin.mp3`）。
 
+## 1.0.84 — 2026-11-01
+
+### 4G 设备 ICCID 自动采集与自动受控
+- 4G 设备（AIR780EHV）开机 J 应答自报 SIM 卡号（`PROTOCOL_J.md`），服务端自动采集：
+  - 写入 `sbox_device_info.iccid`（设备表）和 `snover.iccid`（计费表）
+  - **受控记录只增不减**：管理员在「计费资料设置」删除受控记录 = 明确放弃管控，
+    该设备重连时不会被自动加回（防止靠删除设备绕开计费统计）；
+    标记存独立表 `no_auto_enroll_snover`，同时保留删除时的卡号，管理员手动加回来时自动带上。
+  - 首次上报卡号且不在受控表 → **自动建行**：月费 4.2 元/月、一年后到期、`statu=1`。
+    管理员打开页面设备已在列表，ICCID 已填好，只需按真实套餐改到期时间和月费。
+  - 套餐可配：`[Settings] AutoEnrollFee=4.2` / `AutoEnrollMonths=12`
+- **换卡历史**：写入 `simswap_log.json`（sn / oldIc / newIc / time / imei / ver），
+  首次登记卡号不算换卡，同一卡号重复上报不产生记录。
+
+### 修复
+- `snover.iccid` 建表默认值写成 `DEFAULT iccid`（漏引号），SQLite 当成字符串 `'iccid'`，
+  导致所有未填卡号的行变成 `iccid`/`iccid2` 占位串。迁移修正为 `DEFAULT ''` 并清理占位串。
+- 重建 `snover` 表的 6 个数据丢失隐患：动态保留所有列（不丢自定义列）、
+  重复 sn 不被 `ON CONFLICT IGNORE` 静默吞行、行数校验、15 位合法卡号不被长度启发式误清、
+  清理动作纳入事务、`sqlite_sequence` 保留原 seq。
+- J 应答 JSON 边界识别改为**字符串感知**（原先字符串里的 `{`/`}` 会截断 JSON，iccid 丢失）。
+- J 应答与下一个协议帧粘连时，尾巴交回正常处理链（原先会毒化缓冲区，
+  导致播放控制/对讲应答/设备状态全被吞掉）。
+- 设备表与受控表的卡号更新各自独立判断（原先共用一个门控，会导致设备漏进受控表）。
+- 读配置统一走实际配置文件路径（原先硬编码 `config.ini`，
+  用绝对路径启动时 `AutoEnrollFee` 等设置静默失效）。
+
+### 验证
+- 新增 3 个自动化测试套件（`tools/iccidtest_suite.js` 32 项、
+  `iccid_variants_test.js` 9 项、`iccid_edge_test.js` 5 项），
+  另有并发 30 台、soak 200 台无异常。
+- 测试有效性已验证：退回旧逻辑后对应断言立即失败。
+- 5 个平台二进制全部重建。
+
 ## 1.0.83 — 2026-10-27
 
 ### 修复（严重，仅 darwin-arm64）：1.0.82 的包仍含 Homebrew 绝对路径
