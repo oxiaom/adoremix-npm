@@ -205,9 +205,35 @@ async function runInstall(opts) {
   const config = require('./config');
   // install 的 --force 只刷新二进制/资源，**不覆盖已存在的 config.ini**（避免客户升级时配置丢失）。
   // 需要重建配置请用：adoremix config init --force
-  const cfgOk = await config.ensureConfig(workdir, { interactive: opts.interactive !== false, force: false });
+  const cfgOk = await config.ensureConfig(workdir, {
+    interactive: opts.interactive !== false,
+    force: false,
+    portSeries: opts.portSeries
+  });
   if (!cfgOk) {
     logger.warn('配置未生成。请稍后运行 adoremix config init');
+  } else {
+    // 已存在的 config.ini：--port-series 只在配置不存在时生效（不覆盖客户已有配置），
+    // 但客户可能是想换端口系列，所以这里显式提示一下。
+    const existing = config.readConfig(workdir);
+    if (opts.portSeries !== undefined && opts.portSeries !== null && opts.portSeries !== '' && existing) {
+      const cur = config.portseries.seriesFromConfig(existing);
+      const want = parseInt(opts.portSeries, 10);
+      if (cur !== want) {
+        logger.warn(`配置已存在，未改动端口（当前 ${cur}xx 系列）。`);
+        logger.warn(`  要换成 ${want}xx 系列：adoremix config set-port-series ${want}`);
+      }
+    }
+    // 打印实际端口，便于排查
+    const cfg = config.readConfig(workdir);
+    if (cfg) {
+      const ps = config.portseries.checkSeries(cfg);
+      logger.log(`  端口系列：${ps.series}xx（主控制 ${cfg.Settings.DPort}，HTTP ${cfg.listener.port}）`);
+      if (!ps.ok) {
+        logger.warn('端口不成套（下列端口不属于同一系列）：');
+        ps.problems.forEach(p => logger.warn('  - ' + p));
+      }
+    }
   }
 
   logger.log('');

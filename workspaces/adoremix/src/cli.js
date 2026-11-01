@@ -105,13 +105,15 @@ function buildProgram() {
     .option('--force', '覆盖已有安装')
     .option('--skip-npm-install', '跳过工作目录内 npm install（tts.js 等协作脚本依赖）')
     .option('--no-interactive', '跳过配置向导，使用默认值')
+    .option('--port-series <n>', '端口系列号，如 117 → 所有端口都用 117xx（11733/11700/11706…）')
     .action(async (opts) => {
       const install = require('./install');
       const code = await install.runInstall({
         workdir: resolveWorkdir(opts.workdir),
         force: !!opts.force,
         skipNpmInstall: !!opts.skipNpmInstall,
-        interactive: opts.interactive !== false
+        interactive: opts.interactive !== false,
+        portSeries: opts.portSeries
       });
       process.exitCode = code || 0;
     });
@@ -163,6 +165,44 @@ function buildProgram() {
       for (const k of Object.keys(flat)) {
         logger.log(`${k} = ${flat[k]}`);
       }
+    });
+
+  config
+    .command('set-port-series <n>')
+    .description('把所有端口切到 nxx 系列（如 117 → 11733/11700/11706…）')
+    .option('--workdir <path>')
+    .action((n, opts) => {
+      const cfg = require('./config');
+      const logger2 = require('./logger');
+      const workdir = resolveWorkdir(opts.workdir);
+      const series = parseInt(n, 10);
+      if (!Number.isInteger(series) || series < 0 || series > 640) {
+        logger2.error(`端口系列号无效：${n}（应为 0~640 的整数）`);
+        process.exitCode = 1;
+        return;
+      }
+      const obj = cfg.readConfig(workdir);
+      if (!obj) {
+        logger2.error('配置不存在，请先 adoremix install 或 adoremix config init');
+        process.exitCode = 1;
+        return;
+      }
+      const updated = cfg.portseries.applySeries(obj, series);
+      updated.Settings.PortSeries = series;
+      cfg.writeConfig(workdir, updated);
+      logger2.ok(`端口已切换到 ${series}xx 系列：`);
+      const p = cfg.portseries.portsForSeries(series);
+      logger2.log(`  主控制 DPort      = ${p.Settings.DPort}`);
+      logger2.log(`  设备备用          = ${p.Settings.DataPortBack3}`);
+      logger2.log(`  MP3 跨接          = ${p.Settings.OPort0} / ${p.Settings.OPort1}`);
+      logger2.log(`  喊话裸流          = ${p.Settings.DataPort} / ${p.Settings.DataPortBack2}`);
+      logger2.log(`  运维命令          = ${p.Settings.PS1} / ${p.Settings.PS2}`);
+      logger2.log(`  fcr 指令          = ${p.Settings.BjPort}`);
+      logger2.log(`  管理端口          = ${p.Settings.ManagePort}`);
+      logger2.log(`  WebSocket 喊话    = ${p.Settings.wbport}`);
+      logger2.log(`  HTTP 服务         = ${p.listener.port}`);
+      logger2.log(`  MP3Server         = ${p.MP3Server.port}`);
+      logger2.warn('改端口后要重启服务才生效');
     });
 
   config

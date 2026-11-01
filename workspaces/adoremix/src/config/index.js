@@ -5,6 +5,7 @@ const path = require('path');
 const ini = require('./ini');
 const defaults = require('./defaults');
 const wizard = require('./wizard');
+const portseries = require('./portseries');
 const logger = require('../logger');
 const paths = require('../paths');
 
@@ -52,6 +53,17 @@ async function ensureConfig(workdir, opts) {
     const answers = await wizard.run(merged.Settings || {});
     merged.Settings = Object.assign({}, merged.Settings, answers);
   }
+  // 端口系列：--port-series 117 → 所有端口都用 117xx
+  if (opts.portSeries !== undefined && opts.portSeries !== null && opts.portSeries !== '') {
+    const series = parseInt(opts.portSeries, 10);
+    if (!Number.isInteger(series) || series < 0 || series > 640) {
+      logger.warn(`端口系列号无效（${opts.portSeries}），使用默认端口`);
+    } else {
+      merged = portseries.applySeries(merged, series);
+      merged.Settings.PortSeries = series;
+      logger.ok(`端口已设置为 ${series}xx 系列`);
+    }
+  }
   writeConfig(workdir, merged);
   logger.ok(`配置已生成 ${p}`);
   return true;
@@ -98,5 +110,6 @@ module.exports = {
   listConfig,
   getConfigValue,
   setConfigValue,
-  mergeDeep
+  mergeDeep,
+  portseries
 };
