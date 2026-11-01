@@ -99,7 +99,8 @@ CREATE TABLE `sbox_device_info` (
   `rt` int(11) NOT NULL DEFAULT '0',
   `rtl` int(11) NOT NULL DEFAULT '0',
   `xhstatus` varchar(200) NOT NULL DEFAULT '0',
-  `qianfeiinfo` varchar(1000) DEFAULT '正常使用'  
+  `qianfeiinfo` varchar(1000) DEFAULT '正常使用',
+  `iccid` TEXT NOT NULL DEFAULT ''
 );
 
 -- ----------------------------
