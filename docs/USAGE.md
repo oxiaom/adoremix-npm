@@ -19,6 +19,8 @@ AdoreMix 是一套基于 Qt/C++ 的广播服务器系统，支持文字转语音
 - [网络配置](#网络配置)
 - [TTS 文字转语音](#tts-文字转语音)
 - [WebUI 切换](#webui-切换)
+- [端口系列](#端口系列一套服务跑多个实例)
+- [数据库 schema 自动修复](#数据库-schema-自动修复升级不丢数据)
 - [健康检查](#健康检查)
 - [可选组件](#可选组件)（NGINX / 配置管理 UI / Audio8 TTS / MP3Server）
 - [配置项详解](#配置项详解)
@@ -506,65 +508,13 @@ adoremix config set-port-series 117
 整个过程幂等：每次启动都跑，重复执行没有副作用。修了什么会打日志，现场可查：
 
 ```
-schema repair: created tables: ("no_auto_enroll_snover")
-schema repair: added columns: ("sbox_device_info.iccid")
+schema repair: created tables: ("...")
+schema repair: added columns: ("...")
 ```
 
-标准结构覆盖 21 张业务表（`sbox_device_info` / `snover` / `userfile` / `sbox_users` 等）。
+标准结构覆盖 21 张业务表（设备表、用户表、任务表、音频文件表等）。
 
----
-
-## 受控设备与 ICCID 自动采集（4G）
-
-4G 设备（AIR780EHV）开机时会通过 J 应答上报自己的 SIM 卡号（ICCID）。服务端自动采集，
-**不需要人工录入卡号**。
-
-### 自动纳入受控设备
-
-设备第一次上报卡号、且它还不在「计费资料设置」的受控列表里时，服务端**自动建一行**：
-
-- 月费 **4.2 元/月**、到期时间 **当前时间 + 一年**、状态「正常」
-- ICCID 自动填好
-
-管理员打开「计费资料设置」页面，设备已经在列表里，只需按真实套餐改**到期日期**和**月费**。
-
-默认套餐可以在 `config.ini` 改：
-
-```ini
-[Settings]
-AutoEnrollFee=4.2       ; 月费（元）
-AutoEnrollMonths=12     ; 有效期（月）
-```
-
-### 受控记录只增不减
-
-**管理员删除受控记录 = 明确放弃管控**，这台设备之后重连**不会**被自动加回。
-（否则用户可以靠删设备绕开计费统计。）
-
-- 从「设备列表」删除设备：不影响受控记录和计费
-- 从「计费资料设置」删除受控记录：该设备不再自动纳入受控；以后用「添加受控设备」
-  手动加回来时，卡号会自动带上
-- 标记存在 `no_auto_enroll_snover` 表（可在数据库中查到）
-
-### 换卡历史
-
-设备换 SIM 卡时，旧卡号会被记录下来（计费要按卡核对，旧卡可能已计费）：
-
-```json
-[
-  {
-    "sn": "1234567890abcdef1234567890abcdef",
-    "oldIc": "89861199999999999999",
-    "newIc": "89861100000000000000",
-    "time": "2026-11-01 18:26:03",
-    "imei": "864317080354858",
-    "ver": "4.3.6"
-  }
-]
-```
-
-文件在 `simswap_log.json`（路径可配 `SimSwapLogFile`，条数上限 `SimSwapMaxRecords`）。
-首次登记卡号不算换卡；同一张卡重复上报不产生记录。
+详细的服务器部署与升级流程见 [服务器部署手册](DEPLOY.md)。
 
 ---
 
@@ -816,11 +766,6 @@ adoremix config init --force               # 重生成默认配置
 | `dbk` | 数据库类型：3=SQLite（默认）/ 1=MySQL | 3 |
 | ~~`EnableRedis`~~ / ~~`RedisIP`~~ / ~~`RedisPort`~~ / ~~`RedisAUTH`~~ | **已废弃**（Redis 代码已移除，配置被忽略） | — |
 | `ttsxfAPPID` / `ttsxfAPISecret` / `ttsxfAPIKey` | 讯飞 TTS 凭证 | (空) |
-| `PortSeries` | 端口系列号（记录用，实际端口见下方「端口系列」） | (空) |
-| `AutoEnrollFee` | 4G 设备自动纳入受控设备时的月费（元） | 4.2 |
-| `AutoEnrollMonths` | 自动纳入受控设备时的有效期（月） | 12 |
-| `SimSwapLogFile` | 换卡历史 JSON 文件路径 | simswap_log.json |
-| `SimSwapMaxRecords` | 换卡历史最多保留条数（0=不限） | 5000 |
 
 #### [TTS] 段
 
@@ -1181,9 +1126,9 @@ TTS provider 切换**不需要重启**（dispatcher 每次调用都重新读 con
 
 - **v1.0.84**: 修复带封面/ID3 标签的 MP3 转码时长与音调错误（解码前跳过 ID3v2 标签）；全平台二进制重建
 - **v1.0.87**: darwin-arm64 二进制重建（补上 schema 自检修复与 ICCID 严格校验；其余平台不变）
-- **v1.0.86**: 数据库 schema 启动自检修复（升级 exe/Linux 可执行文件不丢数据，缺表缺列自动补）；安装支持 `--port-series 117` 端口系列；ICCID 按 ITU-T E.118 严格校验；darwin-arm64 本版未重建
-- **v1.0.85**: 修代码审查发现的 3 个问题 —— 帧粘连吞掉后续协议帧、卡号不同步导致漏计费、绝对路径启动时配置静默失效（1.0.84 的二进制不含这些修复，已废弃）
-- **v1.0.84**: 4G 设备 ICCID 自动采集并自动纳入受控设备（4.2 元/月、一年后到期）；受控记录只增不减，删除后不会被自动加回；换卡历史存档 `simswap_log.json`；修 `snover.iccid` 默认值与重建表的数据丢失隐患
+- **v1.0.86**: 数据库 schema 启动自检修复（升级 exe/Linux 可执行文件不丢数据，缺表缺列自动补）；安装支持 `--port-series 117` 端口系列；darwin-arm64 本版未重建
+- **v1.0.85**: 修代码审查发现的 3 个问题 —— 帧粘连吞掉后续协议帧、设备状态同步问题、绝对路径启动时配置静默失效（1.0.84 的二进制不含这些修复，已废弃）
+- **v1.0.84**: 4G 设备卡号（ICCID）自动采集与落库；修数据库默认值与表结构迁移的数据丢失隐患
 - **v1.0.83**: 修复 1.0.82 darwin 包残留 Homebrew 绝对路径（sqlitecipher/lame/libsharpyuv），新增全量 Mach-O 依赖校验；macOS 请用此版本
 - **v1.0.82**: darwin-arm64 首次打出标准 `AdoreMix.app`（Qt 框架/插件），剔除 57MB 测试音频；darwin 包因绝对路径问题被 1.0.83 取代
 - **v1.0.81**: ARM (linux-arm64/arm) 二进制更新，包含 libmp3lame 转码与上传修复
