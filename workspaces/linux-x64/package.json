@@ -13,5 +13,11 @@
     "index.js",
     "native"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ]
 }
