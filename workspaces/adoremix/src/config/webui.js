@@ -10,6 +10,11 @@ const cfg = require('./index');
 const WEBUI_KEY = 'Settings.webui';
 
 const WEBUI_VARIANTS = {
+  ultra: {
+    name: '超低码率',
+    desc: '16k stereo / 16kbps（带宽极差的环境）',
+    dir: 'ultra'
+  },
   low: {
     name: '低码率',
     desc: '16k stereo / 32kbps（WiFi 音响、互联网环境）',
@@ -32,7 +37,7 @@ function getWebuiDir(variant) {
 function deployWebui(workdir, variant) {
   const srcDir = getWebuiDir(variant);
   if (!srcDir) {
-    logger.error(`未知 webui 变体: ${variant}（可选: low / high）`);
+    logger.error(`未知 webui 变体: ${variant}（可选: ultra / low / high）`);
     return false;
   }
   if (!fs.existsSync(srcDir)) {

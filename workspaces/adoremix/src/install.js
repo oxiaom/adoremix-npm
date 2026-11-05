@@ -140,7 +140,7 @@ function deployTtsDispatcher(workdir) {
   logger.log('    测试：adoremix tts test "你好"');
 }
 
-// 部署 WebUI 到 etc/docroot/（按 Settings.webui 配置选 low/high）
+// 部署 WebUI 到 etc/docroot/（按 Settings.webui 配置选 ultra/low/high）
 function deployWebuiIfPresent(workdir) {
   try {
     const webui = require('./config/webui');

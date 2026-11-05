@@ -9,10 +9,11 @@
         config = prefConfig || {};
         lame = new lamejs();
         // 使用输入采样率创建编码器，输出采样率与输入相同
+        // 单声道：与原始可用实现/服务器协议一致（Mp3Encoder(1,...)）
         var inSampleRate = config.inSampleRate || 44100;
         var bitRate = config.bitRate || 32;
 
-        mp3Encoder = new lame.Mp3Encoder(2, inSampleRate, bitRate);
+        mp3Encoder = new lame.Mp3Encoder(1, inSampleRate, bitRate);
         console.log('[Worker] MP3编码器初始化: sampleRate=' + inSampleRate + ', bitRate=' + bitRate);
         self.postMessage({ cmd: 'init' });
     };
@@ -32,19 +33,17 @@
     };
 
     /**
-     * 流式编码：收到左右声道 PCM → 编码为 MP3 帧 → 立即 postMessage 回主线程
-     * 立体声编码
+     * 流式编码：收到单声道 PCM → 编码为 MP3 帧 → 立即 postMessage 回主线程
+     * 单声道编码（与原始可用实现一致）
      */
-    var encodeChunk = function (leftBuf, rightBuf) {
-        var leftMono = convertBuffer(leftBuf);
-        var rightMono = convertBuffer(rightBuf);
+    var encodeChunk = function (arrayBuffer) {
+        samplesMono = convertBuffer(arrayBuffer);
         var chunks = [];
-        var remaining = leftMono.length;
+        var remaining = samplesMono.length;
         for (var i = 0; remaining >= 0; i += maxSamples) {
-            var left = leftMono.subarray(i, i + maxSamples);
-            var right = rightMono.subarray(i, i + maxSamples);
+            var left = samplesMono.subarray(i, i + maxSamples);
             if (left.length === 0) break;
-            var mp3buf = mp3Encoder.encodeBuffer(left, right);
+            var mp3buf = mp3Encoder.encodeBuffer(left);
             if (mp3buf.length > 0) {
                 chunks.push(new Uint8Array(mp3buf));
             }
@@ -71,7 +70,7 @@
                 init(e.data.config);
                 break;
             case 'open':
-                encodeChunk(e.data.left, e.data.right);
+                encodeChunk(e.data.buf);
                 break;
             case 'close':
                 flush();
