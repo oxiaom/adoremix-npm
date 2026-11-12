@@ -74,6 +74,7 @@ echo "==> 修复 AdoreMix.pro..."
 cd "$SRC_DIR"
 sed -i \
   -e 's|-L/opt/qt5\.[0-9][^ ]*plugins/sqldrivers||g' \
+  -e 's|^TARGET = .*|TARGET = '${TARGET_BIN%.exe}'|' \
   -e 's|AdoreMixV8\.0\.17_console_linuxarm0|'${TARGET_BIN%.exe}'|g' \
   -e 's|CONFIG += c++11|QMAKE_CXXFLAGS += -std=gnu++17|g' \
   AdoreMix.pro
