@@ -51,7 +51,22 @@ function copyNative(native, workdir, force) {
   fse.copySync(native.root, workdir, {
     filter: (s) => {
       const base = path.basename(s);
-      return base !== 'README.md' || path.dirname(s) !== native.root;
+      if (base === 'README.md' && path.dirname(s) === native.root) return false;
+      // **绝不覆盖客户自己的数据库**。
+      //
+      // native 目录里带了一份 .Adore.db（示例库）。不带 filter 的话，
+      // `adoremix install --force` 升级时会把客户现场正在用的库覆盖掉 ——
+      // 设备、计费、录音记录全丢。这是不可逆的数据损失。
+      //
+      // 只在目标目录**没有**库时才复制示例库过去。
+      if (base === '.Adore.db') {
+        const dst = path.join(workdir, '.Adore.db');
+        if (fs.existsSync(dst)) {
+          logger.warn('检测到工作目录已有 .Adore.db —— 保留客户现有数据库，不覆盖。');
+          return false;
+        }
+      }
+      return true;
     }
   });
   fs.writeFileSync(marker, JSON.stringify({
