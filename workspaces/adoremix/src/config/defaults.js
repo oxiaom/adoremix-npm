@@ -21,10 +21,13 @@ module.exports = {
     // 仅 DevOfflineMode=app 时有效
     DevOfflineTimeout: 25,
     // 离线判定方式：
-    //   app —— 应用层静默超时（默认）。TCP 半开（断电没发 FIN）时也能发现
-    //   tcp —— 只看 TCP 状态，socket 断开才算离线
-    //   off —— 不做主动判定
-    DevOfflineMode: 'app',
+    //   tcp —— 只看 TCP 状态，socket 断开才算离线（**默认**）。
+    //          弱网/大延迟链路下不会把正常在线的设备误踢。
+    //          代价：设备断电（没发 FIN）要等 TCP 超时才发现。
+    //   app —— 应用层静默超时。TCP 半开（断电没发 FIN）时也能发现，
+    //          但弱网链路会误踢。
+    //   off —— 不做主动判定，只在 socket 真断开时下线。
+    DevOfflineMode: 'tcp',
     // 是否主动发心跳帧：on（默认）/ off
     // 关掉后如果 DevOfflineMode 还是 app，设备会被静默超时踢掉
     DevHeartbeatSend: 'on',

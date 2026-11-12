@@ -526,15 +526,15 @@ schema repair: added columns: ("...")
 
 | 配置项 | 取值 | 默认 | 作用 |
 |---|---|---|---|
-| `DevOfflineMode` | `app` / `tcp` / `off` | `app` | **怎么判离线** |
+| `DevOfflineMode` | `tcp` / `app` / `off` | `tcp` | **怎么判离线** |
 | `DevHeartbeatSend` | `on` / `off` | `on` | **要不要主动发心跳** |
 
 #### `DevOfflineMode` —— 离线判定方式
 
 | 取值 | 判定依据 | 适用场景 |
 |---|---|---|
-| `app` | 多久没收到设备任何上行数据 | 默认。TCP 半开（设备断电没发 FIN）时 socket 仍显示 Connected，只有静默超时才能发现 |
-| `tcp` | **只看 TCP 状态**，socket 断开/报错才算离线 | 设备固件不回心跳；弱网/大延迟链路心跳往返慢，`app` 会误踢 |
+| `tcp` | **只看 TCP 状态**，socket 断开/报错才算离线 | **默认**。弱网/大延迟链路下不会把正常在线的设备误踢 —— 历史上线率下降就是这个判据造成的 |
+| `app` | 多久没收到设备任何上行数据 | 能快速发现断电（TCP 半开时 socket 仍显示 Connected），但弱网链路会误踢 |
 | `off` | 不做主动判定，只在 socket 真断开时下线 | 只想看 TCP 连接状态 |
 
 #### `DevHeartbeatSend` —— 是否发心跳帧
@@ -547,6 +547,11 @@ schema repair: added columns: ("...")
 > ⚠️ **两个开关要配套设置**：
 > `DevHeartbeatSend=off` 时如果 `DevOfflineMode` 还是 `app`，设备因为不发数据会被静默超时踢掉。
 > 常见搭配：`DevOfflineMode=tcp` + `DevHeartbeatSend=off`（纯 TCP 状态判定）。
+
+> 📌 **默认为什么是 tcp**：早期版本用 `app`（心跳静默超时 25 秒）判离线，
+> 在弱网/4G 链路下把大量正常在线的设备误踢，上线率明显下降。
+> 现在默认 `tcp` —— 等同于「加心跳超时踢出之前」的逻辑：只要 TCP 还连着就算在线。
+> 需要快速发现设备断电时，改为 `DevOfflineMode=app` 并把 `DevOfflineTimeout` 调大。
 
 ### 超时阈值
 
@@ -566,13 +571,15 @@ schema repair: added columns: ("...")
 
 ```ini
 [Settings]
-DevOfflineMode=app        ; app / tcp / off
+DevOfflineMode=tcp        ; tcp（默认）/ app / off
 DevHeartbeatSend=on       ; on / off
 DevOfflineTimeout=25      ; 秒，局域网可设 15（仅 app 模式有效）
 DevHeartbeatMode=alt      ; okok / jxxx / alt（仅 on 时有效）
 ```
 
-> 采用类似 MQTT 的 keepalive 模型：心跳间隔 5s，超时阈值 = 若干个心跳周期；TCP 半开（断电无 FIN）时，只有“多久没收到设备数据”才能可靠判断真实在线状态 —— 所以用 `app` 模式时心跳不能关。
+> `app` 模式采用类似 MQTT 的 keepalive 模型：心跳间隔 5s，超时阈值 = 若干个心跳周期；TCP 半开（断电无 FIN）时，只有“多久没收到设备数据”才能可靠判断真实在线状态 —— 所以用 `app` 模式时心跳不能关。
+>
+> `tcp` 模式（默认）没有这个限制：判离线只看 socket 状态，不依赖设备回包。
 
 ## 健康检查
 
@@ -787,7 +794,7 @@ adoremix config init --force               # 重生成默认配置
 | `preurl` | 设备拉资源基准 URL | http://127.0.0.1:12080/ |
 | `isopenrizhi` | 日志开关（true 会保存 mp3 + 播放日志） | false |
 | `DevOfflineTimeout` | 设备静默多少秒判定离线（局域网 15，公网 25~40）。仅 `DevOfflineMode=app` 时有效 | 25 |
-| `DevOfflineMode` | 离线判定方式：app=应用层静默超时 / tcp=只看 TCP 状态 / off=不主动判定 | app |
+| `DevOfflineMode` | 离线判定方式：tcp=只看 TCP 状态（默认）/ app=应用层静默超时 / off=不主动判定 | tcp |
 | `DevHeartbeatSend` | 是否主动发心跳帧：on / off | on |
 | `DevHeartbeatMode` | 心跳内容：okok / jxxx / alt（交替） | alt |
 | `webui` | WebUI 版本（low / high） | low |
