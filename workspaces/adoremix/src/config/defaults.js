@@ -18,7 +18,18 @@ module.exports = {
     DataPort: 6002,
     EnableRedis: false,
     // 设备静默多久判定离线（秒）：局域网 12~15，公网 20~30
+    // 仅 DevOfflineMode=app 时有效
     DevOfflineTimeout: 25,
+    // 离线判定方式：
+    //   app —— 应用层静默超时（默认）。TCP 半开（断电没发 FIN）时也能发现
+    //   tcp —— 只看 TCP 状态，socket 断开才算离线
+    //   off —— 不做主动判定
+    DevOfflineMode: 'app',
+    // 是否主动发心跳帧：on（默认）/ off
+    // 关掉后如果 DevOfflineMode 还是 app，设备会被静默超时踢掉
+    DevHeartbeatSend: 'on',
+    // 心跳内容：okok / jxxx / alt（交替，兼容新旧固件）
+    DevHeartbeatMode: 'alt',
     LocalIP: '127.0.0.1',
     ManagePort: 6007,
     Netcross_Port0: 6000,
