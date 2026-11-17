@@ -16,10 +16,11 @@
   - [健康检查](USAGE.md#健康检查)
 
 - **可选组件**
-  - [MP3Server 音频分块服务（全平台）](USAGE.md#mp3server-音频分块服务选装全平台)
+  - [MP3Server 音频分块服务（全平台）](USAGE.md#mp3server-音频分块服务（选装，全平台）)
   - [NGINX 静态加速](USAGE.md#nginx-静态加速)
-  - [设备配置管理 UI](USAGE.md#设备配置管理-uiconfig-manager)
-  - [Audio8 TTS 自动部署](USAGE.md#audio8-tts本地流式-tts自动远程部署)
+  - [设备配置管理 UI](USAGE.md#设备配置管理-ui（config-manager）)
+  - [Audio8 TTS 自动部署](USAGE.md#audio8-tts（本地离线-tts，自动安装）)
+  - [Audio8 完整配置手册](USAGE.md#audio8-完整配置手册)
 
 - **TTS 文字转语音**
   - [总览与对比](USAGE.md#tts-文字转语音)
@@ -27,12 +28,12 @@
   - [测试 TTS](USAGE.md#测试-tts)
   - [Voice 列表](USAGE.md#查看-voice-列表)
   - [检查依赖](USAGE.md#检查依赖)
-  - [Qt 调用方式](USAGE.md#qtcpp-调用方式开发者参考)
+  - [Qt 调用方式](USAGE.md#qtc-调用方式（开发者参考）)
 
 - **服务器运维**
   - [服务器部署手册](DEPLOY.md)
-  - [端口系列](USAGE.md#端口系列一套服务跑多个实例)
-  - [数据库自动修复](USAGE.md#数据库-schema-自动修复升级不丢数据)
+  - [端口系列](USAGE.md#端口系列（一套服务跑多个实例）)
+  - [数据库自动修复](USAGE.md#数据库-schema-自动修复（升级不丢数据）)
 
 - **参考**
   - [配置项详解](USAGE.md#配置项详解)

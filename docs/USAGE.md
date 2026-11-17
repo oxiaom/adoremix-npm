@@ -764,6 +764,239 @@ adoremix doctor --fix --fix-no-model   # 同上，但不下 423MB 的模型
 > —— 那个端口上什么都没有，日志表现为"连接失败"。
 > 写成 `http://<Audio8所在机器IP>:8024` 才对。
 
+### Audio8 完整配置手册
+
+Audio8 是**自部署**的离线 TTS：模型跑在你自己机器上，AdoreMix 通过 HTTP 调用它。
+和 xf/minimax/edge 的区别是 —— 前三个是云服务（有 token、要联网），
+Audio8 是**自托管服务**（要一台 Linux 机器跑推理）。
+
+#### 两种部署形态
+
+| 形态 | Audio8 跑在哪 | `audio8_base_url` 怎么填 | 适合 |
+|---|---|---|---|
+| **本机部署** | 和 AdoreMix 同一台 Linux 机器 | `http://127.0.0.1:8024`（默认） | 单机一体，最简单 |
+| **远程部署** | 另一台 Linux 机器（可弱可强） | `http://<那台机器IP>:8024` **必须改** | AdoreMix 机器资源不够 / 多个 AdoreMix 共用一个推理服务 |
+
+> ⚠️ **远程部署最容易踩的坑**：不填 `audio8_base_url` 的话，
+> AdoreMix 会去连 `127.0.0.1:8024` —— 那台机器上根本没有 Audio8 服务，
+> 表现是 TTS 一直失败、日志里是"连接失败"。
+> `adoremix doctor` 会专门检查这一项。
+
+#### 本机部署完整步骤
+
+```bash
+# 1. 装运行时（解包源码 + 建 venv + 装依赖 + 注册 systemd 服务）
+#    需要 root。会自动写 config.ini：
+#      [TTS] provider=audio8
+#      [TTS] audio8_base_url=http://127.0.0.1:8024
+adoremix audio8 install
+
+# 2. 下模型（~423MB，默认走 hf-mirror.com 国内可达）
+#    下完会自动把模型内置参考音物化成 default 音色
+adoremix audio8-fetch-model
+
+# 3. 重启服务（模型冷启动加载约 20-30 秒）
+systemctl restart audio8-tts
+
+# 4. 确认健康
+adoremix audio8 status          # GET /api/health 返回 200 才算好
+
+# 5. 让 AdoreMix 用它
+adoremix tts config             # 交互式选 audio8
+# 或直接写：
+adoremix config set TTS.provider audio8
+adoremix config set TTS.audio8_base_url http://127.0.0.1:8024
+
+# 6. 验证
+adoremix tts deps               # 依赖 + 服务可达性
+adoremix tts test "你好，这是测试" # 生成 tty/_cli_test.mp3
+```
+
+#### 远程部署完整步骤
+
+在**跑 Audio8 的那台 Linux 机器**上（和上面 1~4 步一样）：
+
+```bash
+adoremix audio8 install
+adoremix audio8-fetch-model
+systemctl restart audio8-tts
+adoremix audio8 status
+```
+
+在**跑 AdoreMix 的机器**上：
+
+```bash
+adoremix config set TTS.provider audio8
+adoremix config set TTS.audio8_base_url http://192.168.1.114:8024
+adoremix tts deps               # 确认能连通
+adoremix tts test "你好"
+```
+
+> Audio8 服务默认监听 `0.0.0.0:8024`（systemd 单元里是 `--host 0.0.0.0`），
+> 所以跨机器访问没问题。**但要注意防火墙/安全组要放行 8024**。
+
+#### 配置文件
+
+全部配置都在工作目录的 `config.ini`：
+
+```ini
+[TTS]
+provider=audio8                          ; 用 audio8
+audio8_base_url=http://127.0.0.1:8024   ; Audio8 服务地址
+audio8_voice_override=                  ; 留空 = 用模型默认音色
+```
+
+| 键 | 说明 | 默认值 |
+|---|---|---|
+| `TTS.provider` | 选 `audio8` | xf |
+| `TTS.audio8_base_url` | Audio8 服务地址（**远程部署必填**） | http://127.0.0.1:8024 |
+| `TTS.audio8_voice_override` | 强制指定音色（留空用 default） | (空) |
+
+#### 音色
+
+Audio8 **没有预置音色库** —— 第一个音色由 `audio8-fetch-model` 从模型内置的
+参考音频物化出来，名字叫 `default`。所有标准 voice 短名（`xiaoyan`、
+`yunxi` 等）都会映射到 `default`：
+
+```
+$ adoremix tts voices
+  xiaoyan      → default   小燕 - 女声（讯飞，WebUI 默认）
+  ...
+```
+
+所以 **Audio8 目前只有一种音色**（模型自带的那条参考音）。
+要换音色需要走**声音克隆**（见下）。
+
+#### 声音克隆（可选）
+
+用 0.5~30 秒参考音频克隆出自己的音色：
+
+```bash
+# 1. 额外下载注册子模型（+396MB）
+adoremix audio8-fetch-model --registration
+
+# 2. 注册音色（向 Audio8 服务发请求）
+curl -X POST http://127.0.0.1:8024/api/voices/register   -F "audio=@我的参考音频.wav"   -F "text=参考音频对应的文字"   -F "name=my_voice"
+
+# 3. 在 config.ini 里指定用哪个音色
+adoremix config set TTS.audio8_voice_override my_voice
+```
+
+> 注册音色落在 `~/audio8/onnx_runtime_0_1b_int8/voices/<name>/`。
+
+#### 模型来源
+
+默认按顺序尝试，**单个文件下载失败会自动切下一个源**：
+
+1. `https://hf-mirror.com/Audio8/audio8-TTS-0.1B-ONNX-INT8/resolve/main/`（国内可达）
+2. `https://huggingface.co/Audio8/audio8-TTS-0.1B-ONNX-INT8/resolve/main/`（官方，国内常被墙）
+
+**自托管模型**（内网无外网时）—— 把模型文件放到自己的 HTTP 服务上：
+
+```bash
+adoremix audio8-fetch-model https://your-host/models/audio8/
+# 或设环境变量
+export ADOREMIX_AUDIO8_MODEL_URL=https://your-host/models/audio8/
+```
+
+> 模型数据文件**全平台通用**（Linux/Windows/macOS 的模型是同一份），
+> 只是运行时的推理代码不同。
+
+#### 环境变量
+
+| 变量 | 作用 | 默认 |
+|---|---|---|
+| `ADOREMIX_AUDIO8_BASE_URL` | `audio8 status` 检查的服务地址 | http://127.0.0.1:8024 |
+| `ADOREMIX_AUDIO8_MODEL_URL` | 模型下载源（自托管用） | hf-mirror → huggingface |
+| `ADOREMIX_AUDIO8_MODEL_DIR` | 模型存放目录 | `~/audio8/onnx_runtime_0_1b_int8/model` |
+| `ADOREMIX_AUDIO8_WITH_REGISTRATION` | 设为 `1` 时连注册子模型一起下 | (未设) |
+| `ARKTTS_THREADS` | 推理线程数（systemd 单元里按 CPU 核数自动设） | 自动 |
+
+#### systemd 单元
+
+Audio8 由 `audio8-tts.service` 管理：
+
+```bash
+systemctl status audio8-tts      # 状态
+systemctl restart audio8-tts     # 重启（改完模型/音色要重启才生效）
+systemctl enable audio8-tts      # 开机自启
+journalctl -u audio8-tts -n 50  # 看日志
+```
+
+单元里的关键环境变量（一般不用改）：
+
+```ini
+WorkingDirectory=~/audio8/onnx_runtime_0_1b_int8
+Environment=ARKTTS_MODEL_DIR=.../model
+Environment=ARKTTS_VOICES_DIR=.../voices
+Environment=ARKTTS_PRECISION=int8
+Environment=ARKTTS_THREADS=<核数>
+ExecStart=.../python -m uvicorn arktts_runtime.service:app --host 0.0.0.0 --port 8024
+```
+
+#### Audio8 HTTP API（开发者参考）
+
+Audio8 提供 OpenAI 兼容的语音合成接口，AdoreMix 就是调它：
+
+| 接口 | 方法 | 说明 |
+|---|---|---|
+| `/v1/audio/speech` | POST | 语音合成（OpenAI 兼容）。请求体：`model` / `input`（≤1000 字）/ `voice` / `response_format`（`wav`\|`pcm`） |
+| `/api/health` | GET | 健康检查。返回 `ok` / `model` / `precision` / `providers` |
+| `/api/voices/register` | POST | 注册克隆音色。表单字段：`audio`（文件）/ `text` / `name` / `overwrite`（可选） |
+| `/` | GET | 自带的测试页面（浏览器直接打开就能试） |
+
+约束（来自 Audio8 源码）：
+- 参考音频时长 **0.5 ~ 30 秒**，最大 50MB
+- 合成文本单次 **≤1000 字**
+- `response_format` 只支持 `wav` / `pcm`（**没有 mp3**）——
+  AdoreMix 收到 WAV 后用 ffmpeg 转成 mp3 再推给设备
+
+#### 目录结构
+
+```
+~/audio8/onnx_runtime_0_1b_int8/
+├── .venv/bin/python          venv 解释器（onnxruntime / tokenizers 装在这）
+├── model/                    模型文件（10 个，~423MB）
+│   ├── runtime_manifest.json
+│   ├── config.json
+│   ├── reference_codes.npy
+│   ├── codec_decoder_fp16.onnx{,.data}
+│   ├── slow_ar_int8.onnx{,.data}
+│   ├── fast_ar_int8.onnx{,.data}
+│   └── tokenizer/tokenizer.json
+├── voices/default/           音色（meta.json + codes.npy）
+└── src/                      Audio8 运行时源码
+```
+
+> **不要手工挪动这些目录** —— systemd 单元里的路径是写死的。
+
+#### 排障
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| `tts test` 报「连接失败」 | 地址不对 | `adoremix config set TTS.audio8_base_url http://<正确IP>:8024` |
+| 服务连不上（跨机器） | 防火墙没放行 | 放行 8024；确认服务 listen 在 0.0.0.0 |
+| 服务起不来 | 模型没下 | `adoremix audio8-fetch-model` |
+| 服务起不来 | onnxruntime 版本太新 | 0.1B runtime 要求 **<1.24**；`doctor --fix` 会自动降级 |
+| 合成很慢 | CPU 性能不足 | 见下面的性能实测；定时广播预生成可用，实时喊话不建议 |
+| OOM / 服务被杀 | 内存不足 | 模型常驻 ~1.8GB，建议 ≥3GB RAM |
+| 生成的音频是 WAV 不能播 | 缺 ffmpeg | `apt install ffmpeg`（`doctor --fix` 会自动装） |
+| 找不到音色 | 音色没生成 | 重跑 `adoremix audio8-fetch-model`（模型已在，秒过） |
+
+**最快的定位方式**：
+
+```bash
+adoremix doctor --fix    # 一把梭：服务没起/缺 pip 包/缺 ffmpeg/模型没下… 全修
+```
+
+#### 卸载
+
+```bash
+adoremix audio8 uninstall     # 停服务 + 删 systemd 单元 + 删 venv
+# 模型目录要手工删（~700MB）：
+rm -rf ~/audio8
+```
+
 ### ⚠️ 性能实测（2026-10，114 干净机器端到端验证）
 
 CPU int8 推理速度取决于 CPU 核数与单核性能：
