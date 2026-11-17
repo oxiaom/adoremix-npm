@@ -543,7 +543,10 @@ schema repair: added columns: ("...")
 
 ## 设备在线判定（重要）
 
-服务端每 **5 秒**向每台设备发送心跳 `OKOK`，设备会立即回包（4 字节 `OKOK`）。任意回包都会刷新“最后活跃时间”。
+服务端会周期性地与每台设备做一次保活交互（心跳）。设备对心跳的响应会刷新它的“最后活跃时间”，服务端据此判断设备是否在线。
+
+> 心跳交互的具体报文格式属于内部实现细节，不在公开文档中说明。
+> 需要排查设备连通性时，请联系技术支持。
 
 ### 两个独立开关
 
@@ -560,12 +563,12 @@ schema repair: added columns: ("...")
 | `app` | 多久没收到设备任何上行数据 | 能快速发现断电（TCP 半开时 socket 仍显示 Connected），但弱网链路会误踢 |
 | `off` | 不做主动判定，只在 socket 真断开时下线 | 只想看 TCP 连接状态 |
 
-#### `DevHeartbeatSend` —— 是否发心跳帧
+#### `DevHeartbeatSend` —— 是否做保活交互
 
 | 取值 | 行为 |
 |---|---|
-| `on` | 按 `DevHeartbeatMode` 发 `OKOK` / `JXXXXX` / 交替 |
-| `off` | 完全不发心跳帧，只读设备数据 |
+| `on` | 按 `DevHeartbeatMode` 指定的策略与设备做保活交互 |
+| `off` | 不做保活交互，只被动读取设备数据 |
 
 > ⚠️ **两个开关要配套设置**：
 > `DevHeartbeatSend=off` 时如果 `DevOfflineMode` 还是 `app`，设备因为不发数据会被静默超时踢掉。
@@ -597,12 +600,25 @@ schema repair: added columns: ("...")
 DevOfflineMode=tcp        ; tcp（默认）/ app / off
 DevHeartbeatSend=on       ; on / off
 DevOfflineTimeout=25      ; 秒，局域网可设 15（仅 app 模式有效）
-DevHeartbeatMode=alt      ; okok / jxxx / alt（仅 on 时有效）
+DevHeartbeatMode=alt      ; alt（默认，兼容新旧固件）/ okok / jxxx
 ```
 
-> `app` 模式采用类似 MQTT 的 keepalive 模型：心跳间隔 5s，超时阈值 = 若干个心跳周期；TCP 半开（断电无 FIN）时，只有“多久没收到设备数据”才能可靠判断真实在线状态 —— 所以用 `app` 模式时心跳不能关。
+> `app` 模式采用类似 MQTT 的 keepalive 模型：超时阈值 = 若干个心跳周期；TCP 半开（断电无 FIN）时，只有“多久没收到设备数据”才能可靠判断真实在线状态 —— 所以用 `app` 模式时保活交互不能关。
 >
 > `tcp` 模式（默认）没有这个限制：判离线只看 socket 状态，不依赖设备回包。
+
+## 更新日志 / 版本历史
+
+```bash
+adoremix changelog              # 最近 3 个版本
+adoremix changelog -n 10        # 最近 10 个
+adoremix changelog --all        # 全部版本
+```
+
+也可以直接看：
+- 文档站：https://oxiaom.github.io/adoremix-npm/#/CHANGELOG.md
+- npm 包页面（`CHANGELOG.md` 随包发布）
+- GitHub Releases：https://github.com/oxiaom/adoremix-npm/releases
 
 ## 健康检查
 
@@ -1099,8 +1115,8 @@ adoremix config init --force               # 重生成默认配置
 | `isopenrizhi` | 日志开关（true 会保存 mp3 + 播放日志） | false |
 | `DevOfflineTimeout` | 设备静默多少秒判定离线（局域网 15，公网 25~40）。仅 `DevOfflineMode=app` 时有效 | 25 |
 | `DevOfflineMode` | 离线判定方式：tcp=只看 TCP 状态（默认）/ app=应用层静默超时 / off=不主动判定 | tcp |
-| `DevHeartbeatSend` | 是否主动发心跳帧：on / off | on |
-| `DevHeartbeatMode` | 心跳内容：okok / jxxx / alt（交替） | alt |
+| `DevHeartbeatSend` | 是否主动做保活交互：on / off | on |
+| `DevHeartbeatMode` | 保活交互策略：alt（默认，兼容新旧固件）/ okok / jxxx | alt |
 | `webui` | WebUI 版本（low / high） | low |
 | `wbport` | web 后台端口 | 6082 |
 | `DataPort` | 媒体数据端口 | 6002 |
@@ -1128,7 +1144,7 @@ adoremix config init --force               # 重生成默认配置
 |---|---|---|
 | `port` | MP3Server 监听端口（改后需重启服务，设备侧同步修改） | 6665 |
 | `docroot` | 媒体文件根目录（空 = 工作目录 `etc/docroot`） | (空) |
-| `legacy_handshake` | 极老设备固件兼容：首包回 `well\n` 而不是文件大小 | false |
+| `legacy_handshake` | 极老设备固件兼容：改用旧版握手方式 | false |
 
 #### [listener] 段（QtWebApp HTTP 服务）
 
@@ -1486,7 +1502,7 @@ TTS provider 切换**不需要重启**（dispatcher 每次调用都重新读 con
 - **v1.0.77**: Windows/Linux x64 二进制更新（sa_snlist 读写锁、未登记 SN 回收、HTTP 设备列表空指针修复）；Linux x64 2000 台 10 分钟验证通过
 - **v1.0.76**: 设备接入 P1 泄漏修复（转发节点/喊话通道/按键通道）；MP3 通道 ACK 粘包按个数消费、队列溢出丢最旧包、写失败不再卡流；移除已淘汰的 WiFi 机型（`leixing==2`）专用通道
 - **v1.0.74**: 设备连接生命周期改造（会话代际/指针纪律/探活）；默认 `DevOfflineTimeout=25`；文档补齐设备协议、WAL 备份、端口清单
-- **v1.0.72**: 设备在线判定改用心跳 OKOK + 可配置 `DevOfflineTimeout`（默认 20s）；文档补充 SQLite 默认/Redis 已移除
+- **v1.0.72**: 设备在线判定改用心跳保活 + 可配置 `DevOfflineTimeout`（默认 20s）；文档补充 SQLite 默认/Redis 已移除
 - **v1.0.71**: 新增 `DevOfflineTimeout` 配置项 + 「设备在线判定」章节
 - **v1.0.68**: 文档补全（MP3Server 改端口/改目录步骤、配置项表、端口清单、故障排查、卸载命令）+ CLI 帮助
 - **v1.0.67**: MP3Server 关闭连接后的输入保护

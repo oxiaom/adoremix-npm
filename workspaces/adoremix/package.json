@@ -42,14 +42,23 @@
     "tts",
     "webui",
     "config-manager",
-    "audio8-assets"
+    "audio8-assets",
+    "CHANGELOG.md"
   ],
   "keywords": [
     "adoremix",
     "broadcast",
     "server",
     "qt",
-    "installer"
+    "installer",
+    "changelog",
+    "release-notes",
+    "tts"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "homepage": "https://oxiaom.github.io/adoremix-npm/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oxiaom/adoremix-npm.git"
+  }
 }

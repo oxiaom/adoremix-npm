@@ -19,6 +19,38 @@ function buildProgram() {
     .version(pkg.version, '-v, --version');
 
   program
+    .command('changelog')
+    .description('查看版本更新日志（默认显示最近 3 个版本）')
+    .option('-n, --count <n>', '显示最近 N 个版本', '3')
+    .option('--all', '显示全部版本')
+    .action((opts) => {
+      const fs = require('fs');
+      const path = require('path');
+      // CHANGELOG.md 随包发布（package.json files 里有）
+      const p = path.join(__dirname, '..', 'CHANGELOG.md');
+      if (!fs.existsSync(p)) {
+        logger.error('未找到 CHANGELOG.md');
+        logger.log('在线查看：https://oxiaom.github.io/adoremix-npm/#/CHANGELOG.md');
+        return;
+      }
+      const txt = fs.readFileSync(p, 'utf8');
+      // 按 "## <版本> — <日期>" 切块
+      const parts = txt.split(/^(?=## )/m).filter(s => s.startsWith('## '));
+      if (parts.length === 0) {
+        logger.log(txt);
+        return;
+      }
+      const n = opts.all ? parts.length : Math.max(1, parseInt(opts.count, 10) || 3);
+      logger.log(parts.slice(0, n).join('\n'));
+      if (!opts.all && parts.length > n) {
+        logger.log('');
+        logger.log(`（还有 ${parts.length - n} 个版本，全量看：adoremix changelog --all）`);
+      }
+      logger.log('');
+      logger.log('在线查看：https://oxiaom.github.io/adoremix-npm/#/CHANGELOG.md');
+    });
+
+  program
     .command('version')
     .description('打印主包、平台子包和原生二进制信息')
     .action(() => {

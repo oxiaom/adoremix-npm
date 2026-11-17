@@ -85,6 +85,7 @@ adoremix start --daemon
 ## 📖 文档
 
 - [完整使用文档](USAGE.md) — 从安装到高级配置
+- [📋 更新日志 / 版本历史](CHANGELOG.md) — 每个版本改了什么
 - [快速开始](USAGE.md#快速开始)
 - [TTS 配置](USAGE.md#tts-文字转语音)
 - [Audio8 本地离线 TTS 完整配置](USAGE.md#audio8-完整配置手册) — 部署形态、声音克隆、API、排障
