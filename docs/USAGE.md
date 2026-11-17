@@ -329,13 +329,14 @@ adoremix config log --disable   # 关闭（默认）
 
 ## TTS 文字转语音
 
-AdoreMix 支持三种 TTS provider，按需切换：
+AdoreMix 支持四种 TTS provider，按需切换：
 
 | Provider | 费用 | 依赖 | 适用场景 |
 |---|---|---|---|
 | **xf**（科大讯飞） | 约 4000 元/年 | Node.js | 商用，质量高 |
 | **minimax** | 包月几十元 | Node.js | 性价比高 |
 | **edge**（Microsoft Edge TTS） | **免费** | python3 + edge-tts + ffmpeg | 测试 / 低成本 |
+| **audio8**（本地离线 TTS） | **免费**（自部署） | Linux + Audio8 服务 + ffmpeg | 内网 / 完全离线 / 不依赖任何云服务 |
 
 ### 配置 TTS
 
@@ -356,7 +357,25 @@ adoremix config set Settings.ttsxfAPIKey your_apiKey
 # Edge（免费，先装依赖）
 adoremix config set TTS.provider edge
 adoremix tts deps --fix    # 自动装 python3 + edge-tts + ffmpeg
+
+# Audio8（本地自部署，免费）
+#   a) 本机部署（Linux）—— install 会自动把 config.ini 指向本机服务
+adoremix audio8 install
+adoremix audio8-fetch-model
+systemctl restart audio8-tts
+#
+#   b) 远程部署（Audio8 跑在另一台机器上）—— 手工指定服务地址
+adoremix config set TTS.provider audio8
+adoremix config set TTS.audio8_base_url http://192.168.1.114:8024
 ```
+
+> **Audio8 配置要点**：它没有 token，配置的是**服务地址**（`TTS.audio8_base_url`）。
+> 本机部署时 `adoremix audio8 install` 会自动写好这个值；
+> 远程部署（服务在另一台 Linux 机器上）必须手工设置，
+> 否则会连到 AdoreMix 自己的 `127.0.0.1:8024` 上 —— 那个端口上什么都没有。
+>
+> Windows / macOS 不能本机装 Audio8（依赖 systemd），
+> 但可以远程调用 Linux 主机上的 Audio8 —— 配好 `audio8_base_url` 即可。
 
 ### 测试 TTS
 
@@ -409,6 +428,10 @@ adoremix tts list
 
    edge     Edge TTS   Microsoft Edge TTS（python）
           费用: 免费
+          凭证: ✓  依赖: ✗ 缺
+
+  audio8   Audio8 TTS  本地 Audio8 TTS（OpenAI 兼容 API）
+          费用: 免费（自部署）
           凭证: ✓  依赖: ✗ 缺
 ```
 
@@ -584,8 +607,9 @@ DevHeartbeatMode=alt      ; okok / jxxx / alt（仅 on 时有效）
 ## 健康检查
 
 ```bash
-adoremix doctor           # 全面检查
-adoremix doctor --fix     # 检查 + 自动修复
+adoremix doctor                 # 全面检查
+adoremix doctor --fix           # 检查 + 自动修复
+adoremix doctor --fix --fix-no-model   # 自动修复，但跳过 Audio8 模型下载（~423MB）
 ```
 
 检查项：
@@ -605,6 +629,25 @@ adoremix doctor --fix     # 检查 + 自动修复
 - 🔧 **edge TTS 三连坑**：python3-pip 缺失自动装；Debian 12 PEP 668 自动加 `--break-system-packages`；pip 默认走清华镜像避免下载损坏
 - 🔧 dispatcher 协作依赖（ini 等 node 包）：自动 `npm install`（默认走 npmmirror 镜像）
 - 🔧 TTS provider 的 npm 包（crypto-js/ws/log4node）：自动装
+
+**Audio8 自动修复**（`provider=audio8` 或本机装了 audio8 时才检查）：
+
+| 问题 | 自动修复动作 |
+|---|---|
+| 服务没开机自启 | `systemctl enable audio8-tts` |
+| 服务没运行 | `systemctl restart audio8-tts` |
+| venv 缺 onnxruntime | pip 装 `onnxruntime>=1.22,<1.24` |
+| onnxruntime 版本太新（≥1.24） | **自动降级**到 <1.24（0.1B runtime 的硬性要求，不修服务起不来） |
+| venv 缺 tokenizers | pip 装 `tokenizers>=0.20,<0.23` |
+| 模型没下载 / 不完整 | **自动下载**（~423MB，几分钟）。加 `--fix-no-model` 可跳过 |
+| 默认音色缺失 | 调 fetch-model 补音色（模型已在，秒过） |
+| 缺 ffmpeg | 自动装系统包（apt/dnf/yum/apk/pacman） |
+
+> 模型下载走 `adoremix audio8-fetch-model` 子进程 —— 因为 fetchModel 是异步的，
+> 而 doctor 是同步函数，直接调的话 doctor 会先退出、下载刚开始就断了。
+>
+> 远程部署（Audio8 在另一台机器上）时 doctor 不会查本机 systemd，
+> 但会提醒你 `audio8_base_url` 还是默认值 —— 那种情况合成必然连不上。
 
 输出示例：
 ```
@@ -692,6 +735,34 @@ adoremix audio8 uninstall
 - 适配发行版：Debian/Ubuntu（apt）、RHEL/CentOS/AlmaLinux（dnf/yum）、Alpine（apk）、Arch（pacman）
 - 内存占用：模型加载后约 1.8GB，建议 ≥3GB RAM 的机器安装
 - install 结束自动写本地 config.ini：`[TTS] provider=audio8, audio8_base_url=http://127.0.0.1:8024`
+
+**装完之后怎么让 AdoreMix 用它？**
+
+```bash
+# 1. 装完确认服务在跑
+adoremix audio8 status          # GET /api/health
+#    不通就 systemctl restart audio8-tts
+
+# 2. 让 AdoreMix 切到 audio8（写 config.ini [TTS]）
+adoremix tts config             # 交互式选 audio8，会顺便问服务地址
+#   或直接写：
+adoremix config set TTS.provider audio8
+adoremix config set TTS.audio8_base_url http://127.0.0.1:8024
+
+# 3. 验证
+adoremix tts deps               # 依赖 + 服务可达性检查
+adoremix tts test "你好"         # 生成测试 mp3
+
+# 4. 体检（有问题的话让 doctor 自动修）
+adoremix doctor                 # 只看有什么问题
+adoremix doctor --fix           # 自动修（服务没起/缺 pip 包/缺 ffmpeg/模型没下…）
+adoremix doctor --fix --fix-no-model   # 同上，但不下 423MB 的模型
+```
+
+> ⚠️ **远程部署必须手工配 `audio8_base_url`**。
+> Audio8 装在另一台机器上时，AdoreMix 这边默认会连 `127.0.0.1:8024`
+> —— 那个端口上什么都没有，日志表现为"连接失败"。
+> 写成 `http://<Audio8所在机器IP>:8024` 才对。
 
 ### ⚠️ 性能实测（2026-10，114 干净机器端到端验证）
 
@@ -812,10 +883,11 @@ adoremix config init --force               # 重生成默认配置
 
 #### [TTS] 段
 
-| 键 | 说明 |
-|---|---|
-| `provider` | TTS provider（`xf` / `minimax` / `edge`） |
-| `minimax_token` | MiniMax API token |
+| 键 | 说明 | 默认值 |
+|---|---|---|
+| `provider` | TTS provider（`xf` / `minimax` / `edge` / `audio8`） | xf |
+| `minimax_token` | MiniMax API token | (空) |
+| `audio8_base_url` | Audio8 TTS 服务地址（**远程部署必填**，否则会连到本机 8024 端口） | http://127.0.0.1:8024 |
 
 #### [MP3Server] 段（选装 MP3Server 音频分块服务）
 

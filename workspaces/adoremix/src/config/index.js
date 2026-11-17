@@ -51,7 +51,15 @@ async function ensureConfig(workdir, opts) {
     logger.log('提示：可直接回车使用默认值；密码类项回车留空。');
     logger.log('');
     const answers = await wizard.run(merged.Settings || {});
-    merged.Settings = Object.assign({}, merged.Settings, answers);
+    // 向导可能返回 TTS 段（provider 选择的结果）—— 那要并到 [TTS]，
+    // 不能整个塞进 [Settings]（会变成 Settings.TTS.provider，读配置时找不到）。
+    const ttsAnswers = answers.TTS;
+    const settingsAnswers = Object.assign({}, answers);
+    delete settingsAnswers.TTS;
+    merged.Settings = Object.assign({}, merged.Settings, settingsAnswers);
+    if (ttsAnswers && typeof ttsAnswers === 'object') {
+      merged.TTS = Object.assign({}, merged.TTS || {}, ttsAnswers);
+    }
   }
   // 端口系列：--port-series 117 → 所有端口都用 117xx
   if (opts.portSeries !== undefined && opts.portSeries !== null && opts.portSeries !== '') {

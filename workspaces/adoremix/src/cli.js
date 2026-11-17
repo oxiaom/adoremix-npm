@@ -40,14 +40,18 @@ function buildProgram() {
     .description('健康检查：node 版本、二进制、缺库、config.ini、.Adore.db、服务状态')
     .option('--workdir <path>')
     .option('--fix', '自动 apt install 缺的库（需要 root / sudo）')
+    .option('--fix-no-model', '配合 --fix：跳过 Audio8 模型下载（~423MB），只修其它项')
     .action((opts) => {
       const doctor = require('./doctor');
-      process.exitCode = doctor.runDoctor(resolveWorkdir(opts.workdir), { fix: !!opts.fix });
+      process.exitCode = doctor.runDoctor(resolveWorkdir(opts.workdir), {
+        fix: !!opts.fix,
+        fixNoModel: !!opts.fixNoModel
+      });
     });
 
   const ttsCmd = program
     .command('tts')
-    .description('TTS 文字转语音（支持 xf 讯飞 / minimax / edge 三种 provider）');
+    .description('TTS 文字转语音（支持 xf 讯飞 / minimax / edge / audio8 四种 provider）');
 
   ttsCmd
     .command('list')

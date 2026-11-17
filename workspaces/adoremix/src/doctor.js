@@ -466,15 +466,44 @@ function runDoctor(workdir, opts) {
     }
   }
 
-  // 9. Audio8 本机部署体检（Linux + 本机装了 audio8 或 provider=audio8 且指向本机时）
+  // 9. Audio8 部署体检
+  //
+  // 分两种情况：
+  //   - provider=audio8 且指向本机 → 查本机部署（systemd/venv/模型/音色）
+  //   - provider=audio8 且指向远程 → 查远程可达性（第 8 节已查，这里补充说明）
+  //   - 本机装了 audio8 但当前不是这个 provider → 也体检一下（提前发现问题）
   if (process.platform === 'linux') {
     const a8 = require('./doctor-audio8');
     const audio8BaseUrl = (cfgObj.TTS && cfgObj.TTS.audio8_base_url) || 'http://127.0.0.1:8024';
-    const isLocalProvider = providerName === 'audio8' && /^https?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(audio8BaseUrl);
+    const isAudio8 = providerName === 'audio8';
+    const isLocalProvider = isAudio8 && /^https?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(audio8BaseUrl);
+
     if (isLocalProvider || a8.isInstalled()) {
       logger.log('');
       logger.log('=== Audio8 本机部署检查 ===');
-      a8.checkAudio8Deployment(issues, { fix: !!opts.fix, providerActive: isLocalProvider });
+      a8.checkAudio8Deployment(issues, {
+        fix: !!opts.fix,
+        fixNoModel: !!opts.fixNoModel,
+        providerActive: isLocalProvider
+      });
+    } else if (isAudio8) {
+      // provider=audio8 但指向远程 —— 本机不该有 systemd 单元，那是正常的。
+      // 但要提醒：远程部署必须显式配地址，否则会连到本机 8024（那里什么都没有）。
+      logger.log('');
+      logger.log('=== Audio8 检查（远程部署）===');
+      const defaultUrl = 'http://127.0.0.1:8024';
+      if (audio8BaseUrl === defaultUrl) {
+        issues.push({
+          type: 'audio8-remote',
+          severity: 'warn',
+          msg: `provider=audio8 但 audio8_base_url 还是默认的 ${defaultUrl}。如果 Audio8 装在别的机器上，必须改成对方地址（如 http://192.168.1.114:8024），否则合成时会连到本机 8024 端口（那里没有服务）`
+        });
+        logger.warn(`⚠  audio8_base_url 是默认的 ${defaultUrl}`);
+        logger.log('    远程部署请改成：http://<Audio8所在机器IP>:8024');
+        logger.log('    设置：adoremix config set TTS.audio8_base_url http://<IP>:8024');
+      } else {
+        logger.log(`  Audio8 服务地址: ${audio8BaseUrl}（远程）`);
+      }
     }
   }
 

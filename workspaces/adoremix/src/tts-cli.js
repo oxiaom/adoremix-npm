@@ -171,6 +171,33 @@ async function cmdConfig(workdir, opts) {
     logger.log('Edge TTS 是免费的，无需凭证。');
     logger.log('需要: python3 + edge-tts (pip) + ffmpeg');
     logger.log('检查: adoremix tts deps');
+  } else if (r1.provider === 'audio8') {
+    // Audio8 是本机/远程部署的 TTS 服务，没有 token，配置的是服务地址。
+    //
+    // 之前这个分支是空的 —— 选了 audio8 之后既不提示要装服务，
+    // 也不写 audio8_base_url，config.ini 里就只剩 provider=audio8，
+    // 合成时只能连默认的 127.0.0.1:8024（远程部署就连错了）。
+    const cur = c.TTS.audio8_base_url || 'http://127.0.0.1:8024';
+    const r = await prompts({
+      type: 'text',
+      name: 'v',
+      message: `Audio8 服务地址${cur ? '（回车保持当前）' : ''}`,
+      initial: cur
+    });
+    const url = (r.v && r.v.trim()) ? r.v.trim() : cur;
+    cfg.setConfigValue(workdir, 'TTS.audio8_base_url', url);
+    logger.ok(`TTS.audio8_base_url = ${url}`);
+
+    logger.log('');
+    logger.log('Audio8 需要先部署服务：');
+    if (process.platform === 'linux') {
+      logger.log('  本机部署: adoremix audio8 install && adoremix audio8-fetch-model');
+    } else {
+      logger.log('  本机部署仅 Linux 支持（依赖 systemd）。');
+      logger.log('  Windows/macOS 请部署到 Linux 主机后，用上面的地址远程调用。');
+    }
+    logger.log('  检查服务: adoremix audio8 status');
+    logger.log('  依赖检查: adoremix tts deps');
   }
 
   logger.log('');

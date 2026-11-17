@@ -532,7 +532,7 @@ async function status(opts) {
   }
 }
 
-module.exports = { synthesize, checkDeps, VOICES, DEFAULT_BASE_URL, install, uninstall, status, fetchModel, downloadTo };
+module.exports = { synthesize, checkDeps, VOICES, voices: VOICES, DEFAULT_BASE_URL, install, uninstall, status, fetchModel, downloadTo };
 
 // === fetchModel: 单独下载 Audio8 TTS 模型 ===
 // 源优先级:环境变量/参数指定 > hf-mirror.com(国内可达) > huggingface.co(官方,国内常被墙)

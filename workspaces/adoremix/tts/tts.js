@@ -58,7 +58,7 @@ async function main() {
   const providerName = (ttsSection.provider || 'xf').toLowerCase();
   const provider = PROVIDERS[providerName];
   if (!provider) {
-    err(`未知 provider: ${providerName}（可选: xf / minimax / edge）`);
+    err(`未知 provider: ${providerName}（可选: xf / minimax / edge / audio8）`);
     process.exit(3);
   }
 
@@ -75,7 +75,15 @@ async function main() {
     xf_apiKey: ttsSection.xf_apiKey || settings.ttsxfAPIKey || apiKeyArg || '',
     xf_voice_override: ttsSection.xf_voice_override || '',
     minimax_token: ttsSection.minimax_token || '',
-    edge_voice_override: ttsSection.edge_voice_override || ''
+    edge_voice_override: ttsSection.edge_voice_override || '',
+    // Audio8 服务地址。
+    //
+    // 这个字段以前漏了 —— provider 侧读 creds.audio8_base_url，
+    // 拿不到就回退到内置默认 http://127.0.0.1:8024。
+    // 结果：本机部署碰巧能用，但**远程部署连错地址**（连自己的 8024
+    // 而不是配置里的局域网机器），而且 config.ini 里写了也不生效。
+    audio8_base_url: ttsSection.audio8_base_url || '',
+    audio8_voice_override: ttsSection.audio8_voice_override || ''
   };
 
   log(`provider=${providerName} voice=${voice} text=${text.length}字 → ${mp3Name}`);

@@ -74,25 +74,43 @@ const QUESTIONS = [
     message: 'Redis 密码（无可留空）'
   },
   {
-    type: 'confirm',
-    name: '_enableTTS',
-    message: '启用讯飞 TTS？',
-    initial: true
+    type: 'select',
+    name: '_ttsProvider',
+    message: '选择 TTS provider',
+    choices: [
+      { title: 'edge   Edge TTS（免费，需 python3 + edge-tts）', value: 'edge' },
+      { title: 'audio8 本地离线 TTS（免费自部署，需 Audio8 服务）', value: 'audio8' },
+      { title: 'xf     讯飞（商用，约 4000 元/年）', value: 'xf' },
+      { title: 'minimax MiniMax（包月几十元）', value: 'minimax' },
+      { title: '暂不配置 TTS', value: 'none' }
+    ],
+    initial: 0
   },
   {
-    type: (prev) => prev ? 'text' : null,
+    type: (prev, values) => values._ttsProvider === 'xf' ? 'text' : null,
     name: 'ttsxfAPPID',
     message: '讯飞 APPID'
   },
   {
-    type: (prev, values) => values._enableTTS ? 'text' : null,
+    type: (prev, values) => values._ttsProvider === 'xf' ? 'text' : null,
     name: 'ttsxfAPISecret',
     message: '讯飞 APISecret'
   },
   {
-    type: (prev, values) => values._enableTTS ? 'text' : null,
+    type: (prev, values) => values._ttsProvider === 'xf' ? 'text' : null,
     name: 'ttsxfAPIKey',
     message: '讯飞 APIKey'
+  },
+  {
+    type: (prev, values) => values._ttsProvider === 'minimax' ? 'password' : null,
+    name: '_minimaxToken',
+    message: 'MiniMax API token'
+  },
+  {
+    type: (prev, values) => values._ttsProvider === 'audio8' ? 'text' : null,
+    name: '_audio8BaseUrl',
+    message: 'Audio8 服务地址（本机部署回车用默认，远程填对方 IP）',
+    initial: 'http://127.0.0.1:8024'
   }
 ];
 
@@ -118,6 +136,25 @@ async function run(current) {
     }
   }
   delete answers._enableTTS;
+
+  // 把 provider 选择翻译成 config.ini 的实际键。
+  //
+  // 向导只问一次「用哪个 provider」，但各家的凭证字段完全不同
+  // （讯飞在 [Settings]、minimax/audio8 在 [TTS]），所以这里做映射。
+  const provider = answers._ttsProvider;
+  if (provider && provider !== 'none') {
+    answers.TTS = answers.TTS || {};
+    answers.TTS.provider = provider;
+    if (provider === 'minimax' && answers._minimaxToken) {
+      answers.TTS.minimax_token = answers._minimaxToken;
+    }
+    if (provider === 'audio8' && answers._audio8BaseUrl) {
+      answers.TTS.audio8_base_url = answers._audio8BaseUrl;
+    }
+  }
+  delete answers._ttsProvider;
+  delete answers._minimaxToken;
+  delete answers._audio8BaseUrl;
   return answers;
 }
 
