@@ -175,7 +175,7 @@ adoremix install
 2. 复制原生二进制 + Qt 运行时 + 业务资源到工作目录
 3. 设置二进制可执行权限（Linux）
 4. 安装 Node.js 协作依赖（tts.js / find.js 等用到的 axios / ws / crypto-js 等）
-5. 部署 TTS dispatcher（xf / minimax / edge 三选一）
+5. 部署 TTS dispatcher（xf / minimax / edge / audio8 四选一）
 6. 部署 WebUI（默认低码率版）
 7. 生成默认 config.ini（首次会走配置向导）
 

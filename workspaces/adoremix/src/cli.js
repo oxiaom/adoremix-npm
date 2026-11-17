@@ -55,7 +55,7 @@ function buildProgram() {
 
   ttsCmd
     .command('list')
-    .description('列出 3 个 provider + 当前激活 + 凭证/依赖状态')
+    .description('列出所有 provider + 当前激活 + 凭证/依赖状态')
     .option('--workdir <path>')
     .action((opts) => {
       const tts = require('./tts-cli');
