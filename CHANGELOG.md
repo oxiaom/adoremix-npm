@@ -2,6 +2,86 @@
 
 本文件记录 @oxiaom/adoremix 各版本变更。版本号同步主包 + 4-6 个平台子包。
 
+## 1.0.98 — 2026-11-17
+
+### Audio8 完整接入安装向导（原来只有 xf/minimax/edge 三选一）
+
+用户反馈：装了 audio8 之后不知道怎么让 AdoreMix 用它，
+安装说明里也没有 audio8 这个选项。
+
+查下来不只是文档问题，有三个真 bug：
+
+#### 1. dispatcher 没把 audio8_base_url 传给 provider（最严重）
+
+`tts.js` 组装 creds 时漏了 `audio8_base_url`，而 provider 读的就是
+`creds.audio8_base_url` —— 拿不到就回退到内置默认 `http://127.0.0.1:8024`。
+
+后果：
+- 本机部署碰巧能用（默认值正好对）
+- **远程部署连错地址** —— 连 AdoreMix 自己的 8024，而不是配置的局域网机器
+- config.ini 里写了也不生效（写了等于没写）
+
+修：creds 补上 `audio8_base_url` + `audio8_voice_override`。
+
+#### 2. `tts config` 选 audio8 后没有任何分支
+
+菜单里本来就能选 audio8，但选完之后既不提示要装服务，
+也不写 `audio8_base_url` —— config.ini 里只剩 `provider=audio8`。
+
+修：加 audio8 分支，问服务地址 + 提示怎么部署服务。
+
+#### 3. 安装向导只问「启用讯飞 TTS？」
+
+改成四选一（edge / audio8 / xf / minimax + 暂不配置），
+并按各家字段映射到正确的段：
+- 讯飞 → `[Settings].ttsxf*`
+- minimax / audio8 → `[TTS].*`
+
+顺带修 `config/index.js`：向导返回值原来整个塞进 `[Settings]`，
+现在把 `[TTS]` 段单独拆出来合并（否则会变成 `Settings.TTS.provider`，读不到）。
+
+### doctor --fix 自动修复 audio8
+
+之前 audio8 的 `--fix` 只做 `systemctl restart`，其余全是
+「提示用户自己去跑某命令」—— 装完还得手动敲 3~4 条命令才能用起来。
+
+现在能自动修的都修：
+
+| 问题 | 自动修复 |
+|---|---|
+| 没开机自启 | `systemctl enable audio8-tts` |
+| 服务没运行 | `systemctl restart audio8-tts` |
+| 缺 onnxruntime | pip 装 `onnxruntime>=1.22,<1.24` |
+| onnxruntime ≥1.24 | **自动降级**（0.1B runtime 硬性要求，不修服务起不来） |
+| 缺 tokenizers | pip 装 `tokenizers>=0.20,<0.23` |
+| 模型没下载 / 不完整 | **自动下载** ~423MB |
+| 默认音色缺失 | 调 fetch-model 补（模型已在，秒过） |
+| 缺 ffmpeg | 装系统包（apt/dnf/yum/apk/pacman） |
+
+新增 `--fix-no-model`：跳过 423MB 下载只修其它项。
+
+模型下载走**子进程**跑 `adoremix audio8-fetch-model`——
+`fetchModel` 是 async 的而 doctor 是同步函数，直接调的话
+doctor 会先退出、下载刚开始就断了。
+
+另外补了两个原来漏掉的检查：
+- **ffmpeg**（Audio8 返 WAV，AdoreMix 必须靠它转 mp3；
+  缺了在 TTS 层报错，现场很难联想到是这个）
+- 远程部署时 `audio8_base_url` 还是默认值 → 明确提醒
+
+### 其它
+
+- audio8 provider 补导出 `voices` —— 其它三家都导出这个，
+  `tts voices` 命令读的就是它；audio8 只导出 `VOICES`（大写）→ 显示"(无映射)"
+- `install.js` / `cli.js` 的 TTS provider 描述从「三选一」改成「四选一」
+- `docs/USAGE.md`：provider 表、配置示例、TTS 配置参考表、
+  audio8 部署章节、doctor 自动修复能力表都补齐 audio8
+
+### 说明
+
+本次是纯 JS 改动，**5 个平台二进制不需要重建**。
+
+
 ## 1.0.97 — 2026-11-12
 
 ### 修复：Windows 客户"运行起来不能正常登录"
