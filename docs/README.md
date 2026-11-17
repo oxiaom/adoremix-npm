@@ -87,6 +87,7 @@ adoremix start --daemon
 - [完整使用文档](USAGE.md) — 从安装到高级配置
 - [快速开始](USAGE.md#快速开始)
 - [TTS 配置](USAGE.md#tts-文字转语音)
+- [Audio8 本地离线 TTS 完整配置](USAGE.md#audio8-完整配置手册) — 部署形态、声音克隆、API、排障
 - [网络配置](USAGE.md#网络配置)
 - [WebUI 切换](USAGE.md#webui-切换)
 - [故障排查](USAGE.md#故障排查)
@@ -133,7 +134,8 @@ adoremix service install
 | `adoremix config-manager install` | 设备配置管理 UI（9877） | Linux |
 | `adoremix audio8 install` + `adoremix audio8-fetch-model` | 本地离线 TTS（8024） | Linux |
 
-完整命令见 [使用文档](USAGE.md)。
+完整命令见 [使用文档](USAGE.md)，Audio8 的配置细节见
+[Audio8 完整配置手册](USAGE.md#audio8-完整配置手册)。
 
 ## 📊 平台支持
 
@@ -155,12 +157,26 @@ npm 会自动按当前平台拉对应子包，**不用手动选**。
 | 讯飞（xf） | ~4000 元/年 | Node.js | ⭐⭐⭐⭐⭐ |
 | MiniMax | 包月几十元 | Node.js | ⭐⭐⭐⭐ |
 | Edge TTS | **免费** | python + ffmpeg | ⭐⭐⭐⭐ |
-| Audio8（本地） | **免费**（自部署） | Linux + ~1.8GB 内存 + 423MB 模型 | ⭐⭐⭐（弱 CPU 慢，适合定时广播） |
+| [Audio8（本地）](USAGE.md#audio8-完整配置手册) | **免费**（自部署） | Linux + ~1.8GB 内存 + 423MB 模型 | ⭐⭐⭐（弱 CPU 慢，适合定时广播） |
 
 切换 provider 只改 config.ini 一个字段，Qt 代码不用动：
 ```bash
 adoremix tts config
 ```
+
+> **用 Audio8 的话**，装完还要配一下 —— 它是自部署服务，
+> 没有 token，要配的是**服务地址**（`TTS.audio8_base_url`）：
+>
+> ```bash
+> # 本机部署（Linux）：install 会自动写好
+> adoremix audio8 install && adoremix audio8-fetch-model
+>
+> # 远程部署：必须改成对方 IP，否则连本机 8024（那里什么都没有）
+> adoremix config set TTS.provider audio8
+> adoremix config set TTS.audio8_base_url http://192.168.1.114:8024
+> ```
+>
+> 完整步骤见 [Audio8 完整配置手册](USAGE.md#audio8-完整配置手册)。
 
 ## 📁 项目结构
 
