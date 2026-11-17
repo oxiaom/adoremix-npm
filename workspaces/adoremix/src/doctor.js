@@ -468,41 +468,43 @@ function runDoctor(workdir, opts) {
 
   // 9. Audio8 部署体检
   //
-  // 分两种情况：
-  //   - provider=audio8 且指向本机 → 查本机部署（systemd/venv/模型/音色）
-  //   - provider=audio8 且指向远程 → 查远程可达性（第 8 节已查，这里补充说明）
-  //   - 本机装了 audio8 但当前不是这个 provider → 也体检一下（提前发现问题）
+  // 判据是「**本机到底装没装 audio8**」，不是「地址是不是 localhost」。
+  //
+  // 之前用地址判断有个坑：远程部署忘了改 audio8_base_url（还是默认的
+  // 127.0.0.1:8024）时，会被当成"本机部署"→ 报"systemd 单元不存在"，
+  // 而真正的问题是"地址没改"。方向错了，现场更难查。
   if (process.platform === 'linux') {
     const a8 = require('./doctor-audio8');
-    const audio8BaseUrl = (cfgObj.TTS && cfgObj.TTS.audio8_base_url) || 'http://127.0.0.1:8024';
+    const defaultUrl = 'http://127.0.0.1:8024';
+    const audio8BaseUrl = (cfgObj.TTS && cfgObj.TTS.audio8_base_url) || defaultUrl;
     const isAudio8 = providerName === 'audio8';
-    const isLocalProvider = isAudio8 && /^https?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(audio8BaseUrl);
+    const localInstalled = a8.isInstalled();
 
-    if (isLocalProvider || a8.isInstalled()) {
+    if (localInstalled) {
+      // 本机装了 audio8 → 查本机部署（systemd/venv/模型/音色/健康）
       logger.log('');
       logger.log('=== Audio8 本机部署检查 ===');
       a8.checkAudio8Deployment(issues, {
         fix: !!opts.fix,
         fixNoModel: !!opts.fixNoModel,
-        providerActive: isLocalProvider
+        providerActive: isAudio8
       });
     } else if (isAudio8) {
-      // provider=audio8 但指向远程 —— 本机不该有 systemd 单元，那是正常的。
-      // 但要提醒：远程部署必须显式配地址，否则会连到本机 8024（那里什么都没有）。
+      // 本机没装 → 只能是远程部署
       logger.log('');
       logger.log('=== Audio8 检查（远程部署）===');
-      const defaultUrl = 'http://127.0.0.1:8024';
       if (audio8BaseUrl === defaultUrl) {
         issues.push({
           type: 'audio8-remote',
           severity: 'warn',
-          msg: `provider=audio8 但 audio8_base_url 还是默认的 ${defaultUrl}。如果 Audio8 装在别的机器上，必须改成对方地址（如 http://192.168.1.114:8024），否则合成时会连到本机 8024 端口（那里没有服务）`
+          msg: `provider=audio8 但 audio8_base_url 还是默认的 ${defaultUrl}，而本机没装 Audio8。如果 Audio8 装在别的机器上，必须改成对方地址（如 http://192.168.1.114:8024），否则合成时会连到本机 8024 端口（那里没有服务）`
         });
-        logger.warn(`⚠  audio8_base_url 是默认的 ${defaultUrl}`);
+        logger.warn(`⚠  audio8_base_url 是默认的 ${defaultUrl}，本机没装 Audio8`);
         logger.log('    远程部署请改成：http://<Audio8所在机器IP>:8024');
         logger.log('    设置：adoremix config set TTS.audio8_base_url http://<IP>:8024');
+        logger.log('    或在本机装：adoremix audio8 install');
       } else {
-        logger.log(`  Audio8 服务地址: ${audio8BaseUrl}（远程）`);
+        logger.log(`  Audio8 服务地址: ${audio8BaseUrl}（远程，本机未安装）`);
       }
     }
   }

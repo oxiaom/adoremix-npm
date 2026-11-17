@@ -26,7 +26,27 @@ const os = require('os');
 const https = require('https');
 const http = require('http');
 const { URL } = require('url');
-const logger = require('../../src/logger');
+// logger 来自主包的 src/logger —— 但 dispatcher 部署到工作目录时，
+// install 只拷 tts/ 目录（adoremix-tts/），src/ 不跟着走。
+// 硬 require 会让整个 provider 加载失败 → 一调 TTS 就崩
+// （"Cannot find module '../../src/logger'"）。
+//
+// 所以这里做兜底：主包在就用真 logger，不在就退回 console。
+// 只影响日志输出格式，不影响功能。
+let logger;
+try {
+  logger = require('../../src/logger');
+} catch (e) {
+  const noop = () => {};
+  logger = {
+    ok: (m) => console.log('[ok]', m),
+    warn: (m) => console.log('[warn]', m),
+    error: (m) => console.error('[err]', m),
+    log: (m) => console.log(m),
+    info: (m) => console.log(m),
+    debug: noop
+  };
+}
 
 // Audio8 没有预置音色库(每个音色需注册克隆)。install/fetch-model 会自动把模型内置
 // 参考音物化为 default 音色——所有短名先都映射到 default,注册克隆音色后再扩展。
@@ -148,7 +168,9 @@ function synthesize({ text, voice, volume, speed, outFile }, creds) {
           try { fs.unlinkSync(wavTmp); } catch (e) {}
           let bytes = 0;
           try { bytes = fs.statSync(outFile).size; } catch (e) {}
-          resolve({ bytes });
+          // 返回结构要和其它 provider 一致（outFile / provider / voice）——
+          // dispatcher 的日志会读这三个字段，返回少了就打成 undefined。
+          resolve({ bytes, outFile, provider: 'audio8', voice: wantedVoice });
         })
         .catch(reject);
     });
