@@ -2,6 +2,85 @@
 
 本文件记录 @oxiaom/adoremix 各版本变更。版本号同步主包 + 4-6 个平台子包。
 
+## 1.0.101 — 2026-11-21
+
+### 修复：上传音频文件必崩（服务直接挂掉）
+
+客户现场：上传音频文件必崩，进程直接消失，留下 .dmp。
+
+#### 定位
+
+用客户提供的 exe + .dpa 找到崩溃函数（`exe+0x1733d0`），反汇编出崩溃指令：
+```
+movzx ecx, word ptr [rdi + rdx*4]     ; 读交错立体声样本
+mov   word ptr [rbp + rdx*2], cx       ; 写左声道
+movzx ecx, word ptr [rdi + rdx*4 + 2] ; 读
+mov   word ptr [rsi + rdx*2], cx       ; ← 崩在这（写右声道）
+```
+崩在 **libmp3lame 内部的立体声拆分循环**里。
+
+再写了个只用 libmp3lame 的最小复现程序（排除 AdoreMix 干扰），
+逐步二分出**两个独立的硬限制**：
+
+| # | 限制 | 实测 |
+|---|---|---|
+| 1 | `lame_encode_buffer_interleaved` 在这版 libmp3lame 里**必崩** | NS=576/1000/1152 全部 SIGSEGV；而 `lame_encode_buffer`（左右分开）全部正常 |
+| 2 | `hip_decode` 输入块 8192 字节会崩 | chunk=8192 崩、6144 崩、**4096 正常** |
+
+**为什么只有客户那儿崩**：AdoreMix 的立体声路径正好用的 interleaved 版本 → 100% 崩。
+单声道走的是 `lame_encode`，所以之前用单声道文件测一直没测出来。
+
+#### 修复
+
+- `hip_decode` 输入块 8192 → **4096**
+- 喂 lame 时按 **1152 样本**切片（lame 的硬限制：MPEG-1 L3 一帧 1152 样本）
+- 立体声改用 **`lame_encode_buffer(pcmL, pcmR)`**（本来就有分离好的两路），
+  **不再用 interleaved 版本**
+- WAV 路径同样处理（之前也用 interleaved，同样会崩）
+
+#### 验证
+
+- 用之前 100% 崩溃的立体声文件：修复前崩溃留 dump → 修复后上传成功
+  （4.9MB / 821 秒），产物是有效 mp3，无新 dump
+- **声道数是实际探测的**（`parseMpegHeader` 读 MPEG 帧头），不是假设立体声：
+  单声道 / 立体声 / JntStereo 各走各的分支
+- 拿客户目录里**所有真实 mp3** 逐个跑一遍，单声道、立体声、JntStereo 全部成功
+
+### 修复：登录不再改 token
+
+登录接口 `/user/gtoken` 以前每次都 `UPDATE sbox_users SET token=新值`，
+但请求校验用的是**服务启动时读的一次性内存快照**。
+
+于是：客户端在服务A登录 → 库里 token 变了 → 客户端切到服务B（或服务重启）
+→ 快照还是旧 token → 上传报 `_FALSE6` → 用户看到「上传失败」。
+**退出重新登录能好，但那只是绕过不是修复。**
+
+现在登录只校验密码、返回库里现有的 token，token 恒定。
+新增 `/user/resettoken` 作为唯一会改 token 的入口（手动重置）。
+
+所有客户端自动受益（接口语义变了，不用改客户端代码）。
+
+### 设备在线判定：默认改成 TCP
+
+客户反馈加了心跳超时踢出后**上线率明显下降**。
+
+查证发现 `app` 模式（心跳静默超时 25 秒）是后来加的，
+**在加它之前判离线只看 TCP socket 状态** —— 设备只要 TCP 还连着就一直算在线。
+弱网/4G 链路回包慢 → 被误踢 → 重连 → 又被踢。
+
+现在默认 `DevOfflineMode=tcp`，等同于加超时踢出之前的逻辑，老客户升级不用改配置。
+
+| `DevOfflineMode` | 判定依据 |
+|---|---|
+| `tcp`（**默认**） | 只看 TCP 状态，socket 断开才算离线 |
+| `app` | 心跳静默超时（`DevOfflineTimeout` 秒，默认 25） |
+| `off` | 不做主动判定 |
+
+### 二进制
+
+5 个平台全部重建：win32-x64 / linux-x64 / linux-arm64 / linux-arm / darwin-arm64。
+
+
 ## 1.0.100 — 2026-11-21
 
 ### 修复：登录不再改 token —— 修"服务重启后客户端上传失败"
