@@ -21,6 +21,7 @@ AdoreMix 是一套基于 Qt/C++ 的广播服务器系统，支持文字转语音
 - [WebUI 切换](#webui-切换)
 - [端口系列](#端口系列一套服务跑多个实例)
 - [数据库 schema 自动修复](#数据库-schema-自动修复升级不丢数据)
+- [登录与 token](#登录与-token)
 - [健康检查](#健康检查)
 - [可选组件](#可选组件)（NGINX / 配置管理 UI / Audio8 TTS / MP3Server）
 - [配置项详解](#配置项详解)
@@ -619,6 +620,38 @@ adoremix changelog --all        # 全部版本
 - 文档站：https://oxiaom.github.io/adoremix-npm/#/CHANGELOG.md
 - npm 包页面（`CHANGELOG.md` 随包发布）
 - GitHub Releases：https://github.com/oxiaom/adoremix-npm/releases
+
+## 登录与 token
+
+登录接口 `POST /user/gtoken`（参数 `username` + `passwd`）：
+
+```bash
+curl -X POST http://<服务器>:12080/user/gtoken   -F "username=admin" -F "passwd=123123123"
+```
+
+返回 `token` 和 `userid`，后续需要 token 的接口（上传音频、改密码、任务等）都要带上
+`id` + `token`。
+
+**token 是稳定的** —— 登录**不会**重新生成它：
+
+| 操作 | token |
+|---|---|
+| 登录 | 不变，返回库里现有的 |
+| 服务重启 | 不变（客户端不用重新登录） |
+| 多实例 / 负载均衡 | 各实例看到同一个（都从库里读） |
+| `POST /user/resettoken` | **变**（手动重置，唯一会改的入口） |
+
+> 早期版本登录时每次都会 UPDATE token，导致：客户端在服务A登录 → 库的 token 变了 →
+> 切到服务B 时那边还是旧 token → 上传报 `_FALSE6`（token 不对）→ 显示"上传失败"。
+> 退出重新登录能好，但那只是绕过 —— 现在从根上改了。
+
+需要主动换 token（比如怀疑泄露、要踢掉某个客户端）：
+
+```bash
+curl -X POST http://<服务器>:12080/user/resettoken   -F "username=admin" -F "passwd=123123123"
+```
+
+重置后旧 token 立即失效，客户端需要用返回的新 token 重新登录。
 
 ## 健康检查
 
