@@ -2,6 +2,113 @@
 
 本文件记录 @oxiaom/adoremix 各版本变更。版本号同步主包 + 4-6 个平台子包。
 
+## 1.0.102 — 2026-11-27
+
+### 新增：启动时自检数据库触发器（设备改音量后 changetime 不刷新）
+
+#### 问题
+
+设备改了音量/状态，管理端显示的"最后变化时间"（`changetime`）不动。
+
+**根因不在程序逻辑，在数据库层**：刷新 `changetime` 靠的是一个 SQLite 触发器
+`updateee`（挂在 `sbox_device_info` 的 `vol`/`status` 列上）。
+
+而这个触发器**不在 schema_repair 的表定义里** —— 它是建库时用 SQLite 图形工具
+手工加的。所以从 MySQL 迁移过来的库、或者用更早版本建的库，**根本没有它**。
+服务端启动时只补表补列，触发器没人管，于是永远不生效。
+
+#### 修复
+
+`schema_repair.cpp` 里加了触发器的三层自检：
+
+| 层 | 做什么 | 为什么需要 |
+|---|---|---|
+| 1 | **缺失 → 补建** | 从 MySQL 迁过来的库没有它 |
+| 2 | **定义损坏 → 重建** | 见下面的实测 |
+| 3 | **实测验证** | 坏触发器在 SQLite 里是**静默失效**的，不实测发现不了 |
+
+**第 2 层为什么必须有** —— 实测造了一个坏触发器（少了 `where id = OLD.id`）：
+
+```
+改一行设备的音量 → 整张表 366 行的 changetime 全被刷成当前时间
+```
+
+客户的历史数据就这么被冲掉了。所以启动时发现定义不对就 **DROP + CREATE 重建**
+（触发器只是条规则，重建不动表里的任何一行）。
+
+**第 3 层怎么测** —— 在事务里做，测完 ROLLBACK：
+
+```
+BEGIN
+  把某行 changetime 设成 '2000-01-01 00:00:00'
+  改这一行的 vol                    → 触发器应该把 changetime 刷成"现在"
+  看 changetime 变没变              → 这就是判据
+ROLLBACK                            → 客户的 vol 和 changetime 一个字节都不动
+```
+
+不用"改完再改回去"是因为：改回去那一下也会触发触发器，
+`changetime` 最终停在"现在"而不是原值，等于悄悄改了客户一条历史记录。
+
+启动日志会打：
+
+```
+schema repair: created triggers: ("updateee")     ← 原来没有，补建了
+schema repair: repaired triggers: ("updateee")    ← 原来有但坏了，重建了
+schema repair: triggers verified OK: ("updateee (实测生效)")
+```
+
+### 修复：种子库读取时连接没摘干净
+
+`sqlite.cpp` 的 `seedAdminAccountIfNone()` 里，`removeDatabase()` 调用时
+`QSqlQuery` 对象还没析构。Qt 会打印：
+
+```
+QSqlDatabasePrivate::removeDatabase: connection 'adoremix_seed_read' is still in use
+```
+
+而且连接**不会被真正摘掉**（句柄泄漏）。改成把查询包进独立作用域，
+让 query 在摘连接之前就销毁。
+
+### 修复：触发器名字比较比的是指针地址
+
+`schema_repair.cpp` 里判断"是不是同一个触发器"时写的是：
+
+```cpp
+if(TRIGGER_CHECKS[c].name != tr.name) continue;   // 比的是 const char* 指针！
+```
+
+两个不同数组里的 `"updateee"` 字面量**地址不同** → 这个判断永远为真 →
+**整段检查被静默跳过**，坏触发器永远检测不出来。改成 QString 字符串比较。
+
+### 工具：MySQL → SQLite 库转换器
+
+`tools/mysql2sqlite.py` —— 把 mysqldump 转成服务端能用的 `.Adore.db`：
+
+- 建表用 `AdoreSeed.db` 的真实 DDL（那才是客户现网库的结构）
+- 数据按列名映射插入，MySQL 没有的新列（`overtime`/`iccid`）走默认值
+- **自增计数器保留**（`sqlite_sequence`），新记录不会撞 ID
+- token 原样保留 —— 客户端不用重新登录
+
+实测把一个 1346 行的 MySQL 库转过来，**零丢失**。
+
+### 工具：数据库体检
+
+`tools/db_doctor.py` —— 库启动报 "malformed database schema" 时用它查：
+
+```
+python db_doctor.py /path/to/.Adore.db
+```
+
+会指出哪个 schema 对象坏了、哪些表读不了、以及怎么修。
+
+### 工具：MySQL 转换的一键安全替换
+
+`out/replace-db.bat`（Windows）/ `out/replace-db.sh`（Linux）——
+停服务 → 备份 → **删掉 `-wal`/`-shm` 残留** → 替换 → 验证。
+
+删 WAL 那步不能省：SQLite 用 WAL 模式，服务停得不够干净时旧的 `-wal` 会被
+**回放到新库上**，实测用户数从 61 变成 63 —— 数据串了。
+
 ## 1.0.101 — 2026-11-21
 
 ### 修复：上传音频文件必崩（服务直接挂掉）
